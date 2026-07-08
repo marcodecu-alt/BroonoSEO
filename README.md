@@ -1,0 +1,109 @@
+# Broono SEO Content Pipeline
+
+A multi-user web app that produces SEO-focused blog articles for [Broono](https://www.broono.pet/blogs/dog-health-articles) (a dog supplement DTC brand) via an automated agent pipeline: research → propose → draft → review, with a review→draft revision loop, gated by human approval before export.
+
+Broono's blog has solid technical SEO but weak cadence (~12 articles since 2023) and narrow topic coverage (mostly ingredient-led "benefits of X" articles, missing the larger volume of symptom/problem-led search terms dog owners actually use, e.g. "why is my dog limping" vs. "benefits of magnesium for dogs"). The pipeline is built to close that gap.
+
+## Non-goals for v1
+
+- No auto-publishing to Shopify. Output is a formatted document for manual upload.
+- No paid SEO API integration (Ahrefs/Semrush/DataForSEO). Research is free/search-based only.
+- No self-serve signup. Accounts are created directly by the project owner.
+- No fan-out/parallel agent execution. Sequential pipeline, one conditional loop (review → draft).
+
+## Architecture
+
+- **Frontend** (`apps/web`): Next.js, deployed on Vercel.
+- **Auth + DB**: Supabase (email/password auth, Postgres).
+- **Backend / orchestration** (`apps/api`): FastAPI running LangGraph as a library (not the hosted platform).
+- **LLM**: Claude API for all agent calls.
+- **Research**: free/search-based only.
+
+## Structure
+
+```
+apps/
+  web/    Next.js frontend (login, dashboard, article detail)
+  api/    FastAPI backend + LangGraph pipeline
+    app/
+      main.py          FastAPI app + article endpoints
+      graph/
+        state.py        Pipeline state shape
+        nodes.py         research / propose / draft / review nodes
+        graph.py         LangGraph wiring incl. review→draft loop
+```
+
+## Pipeline
+
+```
+research_node → propose_node → draft_node → review_node
+                                    ^              |
+                                    |___(fail)______|
+                                                     |
+                                                  (pass)
+                                                     v
+                                          awaiting_human_approval (end state, resumed via API)
+```
+
+A human comment resumes the graph from `draft_node` with the comment injected as revision context, reusing the same loop path as an internal review failure.
+
+## Review checklist (review_node)
+
+1. No unsupported health/medical claims (highest priority, supplement brand making animal health claims)
+2. Brand tone/voice consistency
+3. On-page SEO basics (headers, natural keyword use, meta description)
+4. No duplication against existing published content
+
+## Data model (Supabase Postgres)
+
+- `users` — id, email, role (`owner` | `reviewer`)
+- `articles` — id, status, brief_json, timestamps
+- `article_versions` — full history of every draft/revision, never overwritten
+- `review_notes` — checklist_json, passed
+- `comments` — human feedback attached to a version, fed back into the draft agent
+- `existing_content_index` — cached index of Broono's published articles, used to avoid duplicate topics
+
+## API (FastAPI, `apps/api`)
+
+- `POST /articles/start` — kick off a new pipeline run (optional topic seed)
+- `GET /articles` — list all articles
+- `GET /articles/{id}` — status, latest draft, review notes, comment history
+- `POST /articles/{id}/approve` — finalize, triggers export
+- `POST /articles/{id}/comment` — attach comment, re-triggers draft→review loop
+- `GET /articles/{id}/export` — formatted document for the approved version
+
+## Dev setup
+
+### Frontend
+
+```
+cd apps/web
+npm install
+npm run dev        # http://localhost:3000
+```
+
+### Backend
+
+```
+cd apps/api
+python -m venv venv
+./venv/Scripts/pip install -r requirements.txt   # Windows
+source venv/bin/activate && pip install -r requirements.txt  # macOS/Linux
+cp .env.example .env   # fill in ANTHROPIC_API_KEY, SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY
+./venv/Scripts/python -m uvicorn app.main:app --reload --port 8000
+```
+
+## Status
+
+Scaffolding stage. LangGraph nodes are stubbed (see TODOs in `apps/api/app/graph/nodes.py`) and API endpoints return 501 pending real implementations. Supabase schema and auth are not yet wired up.
+
+## Build order
+
+1. Supabase schema + auth, create owner + reviewer accounts
+2. FastAPI skeleton, confirm Next.js ↔ FastAPI round trip ✅ (skeleton done)
+3. Build each LangGraph node in isolation with real Claude API calls
+4. Wire the full graph incl. review→draft loop, run one topic through end to end via CLI
+5. Build the Next.js dashboard and article detail view
+6. Wire approve/comment actions from frontend into the backend API
+7. Build the export-to-document step
+8. Run against 2-3 real topics, calibrate the review agent's checklist
