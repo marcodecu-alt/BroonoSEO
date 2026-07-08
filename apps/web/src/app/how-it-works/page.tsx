@@ -83,20 +83,47 @@ export default function HowItWorksPage() {
         <p className="mb-3 text-sm text-ink-soft">
           Every article passes through five agents, in order:
         </p>
-        <div className="mb-8 flex flex-wrap items-center gap-2 text-sm font-medium text-ink">
-          {PIPELINE_ORDER.map((agent, i) => (
-            <span key={agent.name} className="flex items-center gap-2">
-              <span className="rounded-full border border-border bg-white px-3 py-1">
-                {agent.name}
-              </span>
-              {i < PIPELINE_ORDER.length - 1 && (
-                <span className="text-ink-soft/50">→</span>
-              )}
+        <ul className="mb-8 space-y-1.5 text-sm text-ink-soft">
+          <li className="flex gap-2">
+            <span className="text-ink-soft/40">•</span>
+            <span>
+              <strong>Guido</strong> (orchestrator) — kicks things off and hands work between
+              the other four, one at a time
             </span>
-          ))}
-          <span className="text-ink-soft/50">→</span>
-          <span className="rounded-full border border-border bg-white px-3 py-1">You</span>
-        </div>
+          </li>
+          <li className="flex gap-2">
+            <span className="text-ink-soft/40">•</span>
+            <span>
+              <strong>Nicola</strong> — finds a topic
+            </span>
+          </li>
+          <li className="flex gap-2">
+            <span className="text-ink-soft/40">•</span>
+            <span>
+              <strong>Simone</strong> — turns it into a brief
+            </span>
+          </li>
+          <li className="flex gap-2">
+            <span className="text-ink-soft/40">•</span>
+            <span>
+              <strong>Celeste</strong> — writes the article
+            </span>
+          </li>
+          <li className="flex gap-2">
+            <span className="text-ink-soft/40">•</span>
+            <span>
+              <strong>Sofia</strong> — checks it before it lands in your dashboard, awaiting
+              your approval
+            </span>
+          </li>
+          <li className="flex gap-2">
+            <span className="text-ink-soft/40">•</span>
+            <span>
+              You can watch each agent&apos;s actual output for any article on that
+              article&apos;s <strong>Timeline</strong> tab
+            </span>
+          </li>
+        </ul>
 
         <div className="flex flex-col gap-5">
           {PIPELINE_ORDER.map((agent) => (
