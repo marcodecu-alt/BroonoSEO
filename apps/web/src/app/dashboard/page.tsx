@@ -106,6 +106,9 @@ export default function DashboardPage() {
           <span className="text-sm text-ink-soft">SEO Pipeline</span>
         </div>
         <div className="flex items-center gap-4 text-sm text-ink-soft">
+          <Link href="/how-it-works" className="hover:text-ink">
+            How it works
+          </Link>
           <span>{session?.user.email}</span>
           <button
             onClick={handleSignOut}

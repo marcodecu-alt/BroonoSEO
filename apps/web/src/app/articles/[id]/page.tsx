@@ -10,7 +10,6 @@ import {
   ArticleDetail,
   ChecklistItem,
   TimelineStep,
-  agentLabel,
   approveArticle,
   commentOnArticle,
   currentStageLabel,
@@ -20,6 +19,7 @@ import {
   isInProgress,
 } from "@/lib/api";
 import { Logo } from "@/components/Logo";
+import { NODE_AGENTS } from "@/lib/agents";
 
 function ChecklistRow({ label, item }: { label: string; item: ChecklistItem }) {
   return (
@@ -39,21 +39,19 @@ function ChecklistRow({ label, item }: { label: string; item: ChecklistItem }) {
   );
 }
 
-const AGENT_DOT: Record<TimelineStep["agent"], string> = {
-  research_node: "bg-horizon",
-  propose_node: "bg-gold",
-  draft_node: "bg-ink-soft",
-  review_node: "bg-peppermint",
-};
-
 function TimelineStepCard({ step }: { step: TimelineStep }) {
+  const agent = NODE_AGENTS[step.agent];
   return (
-    <div className="relative pl-6">
+    <div className="relative pl-10">
       <span
-        className={`absolute left-0 top-1.5 h-2.5 w-2.5 rounded-full ${AGENT_DOT[step.agent]}`}
-      />
+        className={`absolute left-0 top-0 flex h-7 w-7 items-center justify-center rounded-full text-sm ${agent.colorClass}`}
+      >
+        {agent.emoji}
+      </span>
       <div className="mb-1 flex items-center justify-between">
-        <p className="text-sm font-semibold text-ink">{agentLabel(step.agent)}</p>
+        <p className="text-sm font-semibold text-ink">
+          {agent.name} <span className="font-normal text-ink-soft">— {agent.role}</span>
+        </p>
         <p className="text-xs text-ink-soft/70">
           {new Date(step.created_at).toLocaleString()}
         </p>
@@ -239,7 +237,12 @@ export default function ArticleDetailPage() {
             ← Dashboard
           </Link>
         </div>
-        <span className="text-sm text-ink-soft">{session?.user.email}</span>
+        <div className="flex items-center gap-4 text-sm text-ink-soft">
+          <Link href="/how-it-works" className="hover:text-ink">
+            How it works
+          </Link>
+          <span>{session?.user.email}</span>
+        </div>
       </header>
 
       <main className="mx-auto grid w-full max-w-5xl flex-1 grid-cols-1 gap-6 px-6 py-8 lg:grid-cols-[1fr_320px]">
@@ -309,7 +312,7 @@ export default function ArticleDetailPage() {
             (timeline.length === 0 ? (
               <p className="text-sm text-ink-soft">No steps yet.</p>
             ) : (
-              <div className="space-y-6 border-l border-border pl-1">
+              <div className="space-y-6">
                 {timeline.map((step, i) => (
                   <TimelineStepCard key={i} step={step} />
                 ))}

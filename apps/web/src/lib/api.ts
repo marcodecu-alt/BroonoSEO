@@ -78,22 +78,11 @@ export type TimelineStep =
       created_at: string;
     };
 
-const AGENT_LABELS: Record<TimelineStep["agent"], string> = {
-  research_node: "Research agent",
-  propose_node: "Proposal agent",
-  draft_node: "Draft agent",
-  review_node: "Review agent",
-};
-
-export function agentLabel(agent: TimelineStep["agent"]): string {
-  return AGENT_LABELS[agent];
-}
-
 const STAGE_LABELS: Record<string, string> = {
-  researching: "Research agent is finding topic candidates...",
-  proposed: "Proposal is done. Draft agent is writing the article...",
-  drafting: "Draft agent is writing/revising the article...",
-  reviewing: "Draft is done. Review agent is checking it...",
+  researching: "Nicola is finding topic candidates...",
+  proposed: "Brief is ready. Celeste is writing the article...",
+  drafting: "Celeste is writing/revising the article...",
+  reviewing: "Draft is done. Sofia is checking it...",
   awaiting_approval: "Review passed. Waiting on your approval.",
   approved: "Approved.",
   archived: "Archived.",
