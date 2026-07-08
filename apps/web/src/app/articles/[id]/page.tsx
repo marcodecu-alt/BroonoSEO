@@ -9,10 +9,14 @@ import { supabase } from "@/lib/supabase";
 import {
   ArticleDetail,
   ChecklistItem,
+  TimelineStep,
+  agentLabel,
   approveArticle,
   commentOnArticle,
+  currentStageLabel,
   exportUrl,
   getArticle,
+  getArticleTimeline,
   isInProgress,
 } from "@/lib/api";
 
@@ -34,12 +38,90 @@ function ChecklistRow({ label, item }: { label: string; item: ChecklistItem }) {
   );
 }
 
+const AGENT_DOT: Record<TimelineStep["agent"], string> = {
+  research_node: "bg-purple-500",
+  propose_node: "bg-amber-500",
+  draft_node: "bg-blue-500",
+  review_node: "bg-green-500",
+};
+
+function TimelineStepCard({ step }: { step: TimelineStep }) {
+  return (
+    <div className="relative pl-6">
+      <span
+        className={`absolute left-0 top-1.5 h-2.5 w-2.5 rounded-full ${AGENT_DOT[step.agent]}`}
+      />
+      <div className="mb-1 flex items-center justify-between">
+        <p className="text-sm font-semibold text-zinc-900">{agentLabel(step.agent)}</p>
+        <p className="text-xs text-zinc-400">
+          {new Date(step.created_at).toLocaleString()}
+        </p>
+      </div>
+
+      {step.agent === "research_node" && (
+        <ul className="space-y-2">
+          {step.output.candidates.map((c, i) => (
+            <li key={i} className="rounded-md bg-zinc-50 p-3 text-sm">
+              <p className="font-medium text-zinc-900">{c.topic}</p>
+              <p className="text-xs text-zinc-500">keyword: {c.target_keyword}</p>
+              <p className="mt-1 text-zinc-600">{c.rationale}</p>
+            </li>
+          ))}
+        </ul>
+      )}
+
+      {step.agent === "propose_node" && (
+        <div className="rounded-md bg-zinc-50 p-3 text-sm">
+          <p className="font-medium text-zinc-900">{step.output.title}</p>
+          <p className="text-xs text-zinc-500">
+            keyword: {step.output.target_keyword} · product: {step.output.tied_product}
+          </p>
+          <p className="mt-1 text-zinc-600">{step.output.angle}</p>
+        </div>
+      )}
+
+      {step.agent === "draft_node" && (
+        <div className="rounded-md bg-zinc-50 p-3 text-sm">
+          <p className="mb-1 text-xs text-zinc-500">
+            v{step.output.version_number} · {step.output.created_by.replace("_", " ")}
+          </p>
+          <p className="line-clamp-3 whitespace-pre-line text-zinc-600">
+            {step.output.content}
+          </p>
+        </div>
+      )}
+
+      {step.agent === "review_node" && (
+        <div className="rounded-md bg-zinc-50 p-3 text-sm">
+          <p
+            className={`mb-2 font-medium ${
+              step.output.passed ? "text-green-700" : "text-red-700"
+            }`}
+          >
+            {step.output.passed ? "Passed" : "Failed"}
+          </p>
+          <div className="space-y-1 text-xs text-zinc-600">
+            <p>
+              health claims: {step.output.checklist.health_claims.note}
+            </p>
+            <p>tone: {step.output.checklist.tone.note}</p>
+            <p>seo basics: {step.output.checklist.seo_basics.note}</p>
+            <p>duplication: {step.output.checklist.duplication.note}</p>
+          </div>
+        </div>
+      )}
+    </div>
+  );
+}
+
 export default function ArticleDetailPage() {
   const params = useParams<{ id: string }>();
   const router = useRouter();
   const [session, setSession] = useState<Session | null>(null);
   const [checked, setChecked] = useState(false);
   const [detail, setDetail] = useState<ArticleDetail | null>(null);
+  const [timeline, setTimeline] = useState<TimelineStep[]>([]);
+  const [activeTab, setActiveTab] = useState<"draft" | "timeline">("draft");
   const [error, setError] = useState<string | null>(null);
   const [commentText, setCommentText] = useState("");
   const [submittingComment, setSubmittingComment] = useState(false);
@@ -47,8 +129,12 @@ export default function ArticleDetailPage() {
 
   const refresh = useCallback(async () => {
     try {
-      const data = await getArticle(params.id);
+      const [data, steps] = await Promise.all([
+        getArticle(params.id),
+        getArticleTimeline(params.id),
+      ]);
       setDetail(data);
+      setTimeline(steps);
       setError(null);
     } catch {
       setError("Couldn't load this article.");
@@ -148,7 +234,7 @@ export default function ArticleDetailPage() {
 
       <main className="mx-auto grid w-full max-w-5xl flex-1 grid-cols-1 gap-6 px-6 py-8 lg:grid-cols-[1fr_320px]">
         <div className="min-w-0 rounded-lg border border-zinc-200 bg-white p-8">
-          <div className="mb-6 flex items-center justify-between">
+          <div className="mb-4 flex items-center justify-between">
             <h1 className="text-xl font-semibold text-zinc-900">
               {article.brief_json?.title || "Untitled"}
             </h1>
@@ -157,27 +243,68 @@ export default function ArticleDetailPage() {
             </span>
           </div>
 
-          {inProgress && (
-            <p className="mb-6 rounded-md bg-blue-50 px-3 py-2 text-sm text-blue-700">
-              Pipeline is running ({article.status.replace("_", " ")}...). This page
-              refreshes automatically.
-            </p>
-          )}
+          <p
+            className={`mb-4 rounded-md px-3 py-2 text-sm ${
+              article.status === "failed"
+                ? "bg-red-50 text-red-700"
+                : inProgress
+                ? "bg-blue-50 text-blue-700"
+                : "bg-zinc-50 text-zinc-600"
+            }`}
+          >
+            {currentStageLabel(article.status)}
+            {inProgress && " This page refreshes automatically."}
+          </p>
 
-          {article.status === "failed" && (
+          {article.status === "failed" && article.error_message && (
             <div className="mb-6 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
-              <p className="font-medium">Pipeline run failed.</p>
-              <p className="mt-1">{article.error_message || "No error details recorded."}</p>
+              <p className="font-medium">Error details:</p>
+              <p className="mt-1">{article.error_message}</p>
             </div>
           )}
 
-          {latest_version ? (
-            <article className="prose prose-zinc max-w-none prose-headings:font-semibold">
-              <ReactMarkdown>{latest_version.content}</ReactMarkdown>
-            </article>
-          ) : (
-            <p className="text-sm text-zinc-500">No draft yet.</p>
-          )}
+          <div className="mb-6 flex gap-1 border-b border-zinc-200">
+            <button
+              onClick={() => setActiveTab("draft")}
+              className={`px-3 py-2 text-sm font-medium ${
+                activeTab === "draft"
+                  ? "border-b-2 border-zinc-900 text-zinc-900"
+                  : "text-zinc-500 hover:text-zinc-700"
+              }`}
+            >
+              Draft
+            </button>
+            <button
+              onClick={() => setActiveTab("timeline")}
+              className={`px-3 py-2 text-sm font-medium ${
+                activeTab === "timeline"
+                  ? "border-b-2 border-zinc-900 text-zinc-900"
+                  : "text-zinc-500 hover:text-zinc-700"
+              }`}
+            >
+              Timeline ({timeline.length})
+            </button>
+          </div>
+
+          {activeTab === "draft" &&
+            (latest_version ? (
+              <article className="prose prose-zinc max-w-none prose-headings:font-semibold">
+                <ReactMarkdown>{latest_version.content}</ReactMarkdown>
+              </article>
+            ) : (
+              <p className="text-sm text-zinc-500">No draft yet.</p>
+            ))}
+
+          {activeTab === "timeline" &&
+            (timeline.length === 0 ? (
+              <p className="text-sm text-zinc-500">No steps yet.</p>
+            ) : (
+              <div className="space-y-6 border-l border-zinc-200 pl-1">
+                {timeline.map((step, i) => (
+                  <TimelineStepCard key={i} step={step} />
+                ))}
+              </div>
+            ))}
         </div>
 
         <div className="flex flex-col gap-6">

@@ -28,11 +28,27 @@ def _persist_stream(article_id: str, stream, version_number: int):
         for update in stream:
             for node_name, partial in update.items():
                 if node_name == "research_node":
+                    supabase.table("pipeline_steps").insert(
+                        {
+                            "article_id": article_id,
+                            "agent": "research_node",
+                            "output_json": {
+                                "candidates": partial["research_candidates"]
+                            },
+                        }
+                    ).execute()
                     supabase.table("articles").update(
                         {"status": "researching"}
                     ).eq("id", article_id).execute()
 
                 elif node_name == "propose_node":
+                    supabase.table("pipeline_steps").insert(
+                        {
+                            "article_id": article_id,
+                            "agent": "propose_node",
+                            "output_json": partial["brief"],
+                        }
+                    ).execute()
                     supabase.table("articles").update(
                         {"brief_json": partial["brief"], "status": "proposed"}
                     ).eq("id", article_id).execute()

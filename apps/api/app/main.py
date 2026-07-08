@@ -109,6 +109,74 @@ def get_article(article_id: str):
     }
 
 
+@app.get("/articles/{article_id}/timeline")
+def get_article_timeline(article_id: str):
+    """Every agent step for this article, in order: research candidates, the
+    proposed brief, each draft version, each review pass."""
+    article_resp = (
+        supabase.table("articles").select("id").eq("id", article_id).execute()
+    )
+    if not article_resp.data:
+        raise HTTPException(status_code=404, detail="article not found")
+
+    steps = []
+
+    for row in (
+        supabase.table("pipeline_steps")
+        .select("*")
+        .eq("article_id", article_id)
+        .execute()
+        .data
+    ):
+        steps.append(
+            {
+                "agent": row["agent"],
+                "output": row["output_json"],
+                "created_at": row["created_at"],
+            }
+        )
+
+    for row in (
+        supabase.table("article_versions")
+        .select("*")
+        .eq("article_id", article_id)
+        .execute()
+        .data
+    ):
+        steps.append(
+            {
+                "agent": "draft_node",
+                "output": {
+                    "version_number": row["version_number"],
+                    "content": row["content"],
+                    "created_by": row["created_by"],
+                },
+                "created_at": row["created_at"],
+            }
+        )
+
+    for row in (
+        supabase.table("review_notes")
+        .select("*")
+        .eq("article_id", article_id)
+        .execute()
+        .data
+    ):
+        steps.append(
+            {
+                "agent": "review_node",
+                "output": {
+                    "checklist": row["checklist_json"],
+                    "passed": row["passed"],
+                },
+                "created_at": row["created_at"],
+            }
+        )
+
+    steps.sort(key=lambda s: s["created_at"])
+    return steps
+
+
 @app.post("/articles/{article_id}/approve")
 def approve_article(article_id: str):
     resp = (
