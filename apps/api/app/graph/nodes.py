@@ -109,17 +109,55 @@ def research_node(state: PipelineState) -> PipelineState:
     }
 
 
+PROPOSE_SYSTEM_PROMPT = """You are the proposal agent for Broono, a dog supplement DTC brand.
+
+You'll be given a shortlist of research candidates, each with a topic, target keyword, and \
+rationale. Select the single strongest candidate, the one with the clearest search demand and \
+the best content gap, and turn it into a concrete content brief.
+
+Output:
+- title: a compelling working title in Broono's blog voice (plain, helpful, not clickbait)
+- target_keyword: the primary SEO keyword to write for
+- angle: one or two sentences on the specific entry point/angle the article will take
+- tied_product: which Broono supplement category this ties back to (e.g. joint/mobility, \
+digestive, skin/coat, calming, immune support), inferred from the candidate's rationale"""
+
+PROPOSE_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "title": {"type": "string"},
+        "target_keyword": {"type": "string"},
+        "angle": {"type": "string"},
+        "tied_product": {"type": "string"},
+    },
+    "required": ["title", "target_keyword", "angle", "tied_product"],
+    "additionalProperties": False,
+}
+
+
 def propose_node(state: PipelineState) -> PipelineState:
     """Pick the strongest research candidate and build a structured brief."""
-    # TODO: select candidate, build brief via Claude
+    candidates = state.get("research_candidates", [])
+
+    response = client.messages.create(
+        model=MODEL,
+        max_tokens=16000,
+        system=PROPOSE_SYSTEM_PROMPT,
+        output_config={"format": {"type": "json_schema", "schema": PROPOSE_OUTPUT_SCHEMA}},
+        messages=[
+            {
+                "role": "user",
+                "content": "Research candidates:\n" + json.dumps(candidates, indent=2),
+            }
+        ],
+    )
+
+    text_block = next(b for b in response.content if b.type == "text")
+    brief = json.loads(text_block.text)
+
     return {
         **state,
-        "brief": {
-            "title": "",
-            "target_keyword": "",
-            "angle": "",
-            "tied_product": "",
-        },
+        "brief": brief,
         "status": "proposed",
     }
 
