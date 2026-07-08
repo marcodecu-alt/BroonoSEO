@@ -64,12 +64,26 @@ export type ResearchCandidate = {
   rationale: string;
 };
 
+export type SearchTrailEntry = {
+  query: string;
+  sources: string[];
+};
+
 export type TimelineStep =
-  | { agent: "research_node"; output: { candidates: ResearchCandidate[] }; created_at: string }
+  | {
+      agent: "research_node";
+      output: { candidates: ResearchCandidate[]; searches: SearchTrailEntry[] };
+      created_at: string;
+    }
   | { agent: "propose_node"; output: Brief; created_at: string }
   | {
       agent: "draft_node";
-      output: { version_number: number; content: string; created_by: string };
+      output: {
+        version_number: number;
+        content: string;
+        created_by: string;
+        style_references: string[];
+      };
       created_at: string;
     }
   | {

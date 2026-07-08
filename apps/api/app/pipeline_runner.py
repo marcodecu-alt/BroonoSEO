@@ -33,7 +33,8 @@ def _persist_stream(article_id: str, stream, version_number: int):
                             "article_id": article_id,
                             "agent": "research_node",
                             "output_json": {
-                                "candidates": partial["research_candidates"]
+                                "candidates": partial["research_candidates"],
+                                "searches": partial.get("research_searches", []),
                             },
                         }
                     ).execute()
@@ -66,6 +67,7 @@ def _persist_stream(article_id: str, stream, version_number: int):
                                 "version_number": version_number,
                                 "content": partial["draft_content"],
                                 "created_by": "draft_agent",
+                                "style_references": partial.get("draft_references", []),
                             }
                         )
                         .execute()

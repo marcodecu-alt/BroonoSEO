@@ -1,9 +1,45 @@
 import json
 import re
+from urllib.parse import urlparse
 
 from ..claude_client import client, MODEL
 from ..supabase_client import supabase
 from .state import PipelineState
+
+
+def _domain(url: str) -> str:
+    return urlparse(url).netloc.removeprefix("www.")
+
+
+def _extract_search_trail(response) -> list[dict]:
+    """Pull out each web_search call Nicola made and which domains it returned,
+    so the Timeline can show her actual research process, not just her
+    conclusions."""
+    queries_by_id = {}
+    for block in response.content:
+        if block.type == "server_tool_use" and block.name == "web_search":
+            queries_by_id[block.id] = block.input.get("query", "")
+
+    trail = []
+    for block in response.content:
+        if block.type != "web_search_tool_result":
+            continue
+        query = queries_by_id.get(block.tool_use_id, "")
+        results = block.content if isinstance(block.content, list) else []
+        sources = sorted({_domain(r.url) for r in results if getattr(r, "url", None)})
+        trail.append({"query": query, "sources": sources})
+    return trail
+
+
+def _extract_fetched_urls(response) -> list[str]:
+    """Which URL(s) Celeste actually fetched for style reference."""
+    urls = []
+    for block in response.content:
+        if block.type == "server_tool_use" and block.name == "web_fetch":
+            url = block.input.get("url")
+            if url:
+                urls.append(url)
+    return urls
 
 
 def _run_with_server_tools(system_prompt, user_content, tools, output_schema=None, max_tokens=16000):
@@ -168,6 +204,7 @@ def research_node(state: PipelineState) -> PipelineState:
     return {
         **state,
         "research_candidates": candidates,
+        "research_searches": _extract_search_trail(response),
         "status": "researching",
     }
 
@@ -313,6 +350,7 @@ def draft_node(state: PipelineState) -> PipelineState:
     return {
         **state,
         "draft_content": text,
+        "draft_references": _extract_fetched_urls(response),
         "revision_notes": None,
         "status": "drafting",
     }

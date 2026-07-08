@@ -23,8 +23,10 @@ class ReviewChecklist(TypedDict):
 class PipelineState(TypedDict, total=False):
     topic_seed: Optional[str]
     research_candidates: list[dict]
+    research_searches: list[dict]
     brief: Brief
     draft_content: str
+    draft_references: list[str]
     review_checklist: ReviewChecklist
     review_passed: bool
     revision_notes: Optional[str]

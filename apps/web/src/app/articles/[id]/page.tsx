@@ -59,15 +59,37 @@ function TimelineStepCard({ step }: { step: TimelineStep }) {
       </div>
 
       {step.agent === "research_node" && (
-        <ul className="space-y-2">
-          {step.output.candidates.map((c, i) => (
-            <li key={i} className="rounded-md bg-cream p-3 text-sm">
-              <p className="font-medium text-ink">{c.topic}</p>
-              <p className="text-xs text-ink-soft">keyword: {c.target_keyword}</p>
-              <p className="mt-1 text-ink-soft">{c.rationale}</p>
-            </li>
-          ))}
-        </ul>
+        <>
+          {step.output.searches?.length > 0 && (
+            <div className="mb-2 rounded-md bg-cream p-3">
+              <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-soft/70">
+                Searches run
+              </p>
+              <div className="flex flex-col gap-1.5">
+                {step.output.searches.map((s, i) => (
+                  <p key={i} className="text-xs">
+                    <span className="text-ink">&quot;{s.query}&quot;</span>
+                    {s.sources.length > 0 && (
+                      <span className="text-ink-soft"> → {s.sources.join(", ")}</span>
+                    )}
+                  </p>
+                ))}
+              </div>
+            </div>
+          )}
+          <p className="mb-2 text-xs font-medium uppercase tracking-wide text-ink-soft/70">
+            Candidates found
+          </p>
+          <ul className="space-y-2">
+            {step.output.candidates.map((c, i) => (
+              <li key={i} className="rounded-md bg-cream p-3 text-sm">
+                <p className="font-medium text-ink">{c.topic}</p>
+                <p className="text-xs text-ink-soft">keyword: {c.target_keyword}</p>
+                <p className="mt-1 text-ink-soft">{c.rationale}</p>
+              </li>
+            ))}
+          </ul>
+        </>
       )}
 
       {step.agent === "propose_node" && (
@@ -85,6 +107,24 @@ function TimelineStepCard({ step }: { step: TimelineStep }) {
           <p className="mb-1 text-xs text-ink-soft">
             v{step.output.version_number} · {step.output.created_by.replace("_", " ")}
           </p>
+          {step.output.style_references?.length > 0 && (
+            <p className="mb-2 text-xs text-ink-soft">
+              Style reference:{" "}
+              {step.output.style_references.map((url, i) => (
+                <span key={url}>
+                  {i > 0 && ", "}
+                  <a
+                    href={url}
+                    target="_blank"
+                    rel="noopener noreferrer"
+                    className="text-horizon hover:underline"
+                  >
+                    {new URL(url).pathname.split("/").pop()}
+                  </a>
+                </span>
+              ))}
+            </p>
+          )}
           <p className="line-clamp-3 whitespace-pre-line text-ink-soft">
             {step.output.content}
           </p>

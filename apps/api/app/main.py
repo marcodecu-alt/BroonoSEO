@@ -150,6 +150,7 @@ def get_article_timeline(article_id: str):
                     "version_number": row["version_number"],
                     "content": row["content"],
                     "created_by": row["created_by"],
+                    "style_references": row.get("style_references") or [],
                 },
                 "created_at": row["created_at"],
             }
