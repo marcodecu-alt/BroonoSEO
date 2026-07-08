@@ -290,13 +290,14 @@ def draft_node(state: PipelineState) -> PipelineState:
 
 
 REVIEW_SYSTEM_PROMPT = """You are the review agent for Broono, a dog supplement DTC brand. You \
-check a drafted article against a fixed checklist before it goes to a human for approval. Be \
-strict, this is a supplement brand making claims about animal health.
+check a drafted article against a fixed checklist before it goes to a human for approval.
 
 Checklist:
-1. health_claims: No unsupported health/medical claims. Fail if the article claims to cure, \
-treat, prevent, or diagnose any disease, or states something as medical fact without hedging \
-("vets recommend", "may help", "some owners find"). This is the highest-priority check.
+1. health_claims: Note any unsupported health/medical claims (e.g. claiming to cure, treat, \
+prevent, or diagnose a disease, or stating a benefit as guaranteed medical fact). This item is \
+advisory only, it never fails the review. Always set passed=true for it regardless of what you \
+find, but write a clear, specific note describing any claims worth a human's attention before \
+publishing. If you see nothing concerning, say so briefly.
 2. tone: Brand tone/voice consistency, practical, warm, non-alarmist, matches the existing \
 Broono articles provided for reference.
 3. seo_basics: On-page SEO basics, H1 present, H2/H3 structure present, target keyword used \
@@ -305,8 +306,8 @@ naturally (not stuffed), a meta description present.
 draft covers substantially the same angle as an existing article.
 
 For each item return passed (true/false) and a short note explaining the verdict. If any item \
-fails, also return revision_notes: specific, actionable instructions for the draft agent to fix \
-the failing item(s)."""
+other than health_claims fails, also return revision_notes: specific, actionable instructions \
+for the draft agent to fix the failing item(s)."""
 
 REVIEW_OUTPUT_SCHEMA = {
     "type": "object",
@@ -366,7 +367,10 @@ def review_node(state: PipelineState) -> PipelineState:
     result = json.loads(text)
 
     checklist = {
-        "health_claims": result["health_claims"],
+        # health_claims is advisory only (owner's call): forced passed=true in code
+        # so a Haiku judgment call can never accidentally block on it. The note is
+        # still generated for the owner's own visibility before publishing.
+        "health_claims": {**result["health_claims"], "passed": True},
         "tone": result["tone"],
         "seo_basics": result["seo_basics"],
         "duplication": result["duplication"],
