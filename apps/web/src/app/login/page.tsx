@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import { supabase } from "@/lib/supabase";
+import { Logo } from "@/components/Logo";
 
 export default function LoginPage() {
   const router = useRouter();
@@ -29,45 +30,52 @@ export default function LoginPage() {
   }
 
   return (
-    <div className="flex flex-1 items-center justify-center bg-zinc-50">
-      <form
-        onSubmit={handleSubmit}
-        className="flex w-full max-w-sm flex-col gap-4 rounded-lg border border-zinc-200 bg-white p-8 shadow-sm"
-      >
-        <h1 className="text-xl font-semibold text-zinc-900">Sign in</h1>
+    <div className="flex flex-1 items-center justify-center bg-cream">
+      <div className="flex w-full max-w-sm flex-col items-center gap-6">
+        <Logo className="h-8 w-auto" />
 
-        <label className="flex flex-col gap-1 text-sm text-zinc-700">
-          Email
-          <input
-            type="email"
-            required
-            value={email}
-            onChange={(e) => setEmail(e.target.value)}
-            className="rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
-          />
-        </label>
-
-        <label className="flex flex-col gap-1 text-sm text-zinc-700">
-          Password
-          <input
-            type="password"
-            required
-            value={password}
-            onChange={(e) => setPassword(e.target.value)}
-            className="rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
-          />
-        </label>
-
-        {error && <p className="text-sm text-red-600">{error}</p>}
-
-        <button
-          type="submit"
-          disabled={loading}
-          className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50"
+        <form
+          onSubmit={handleSubmit}
+          className="flex w-full flex-col gap-4 rounded-lg border border-border bg-white p-8 shadow-sm"
         >
-          {loading ? "Signing in..." : "Sign in"}
-        </button>
-      </form>
+          <div>
+            <h1 className="text-xl font-semibold text-ink">Sign in</h1>
+            <p className="text-sm text-ink-soft">SEO Pipeline</p>
+          </div>
+
+          <label className="flex flex-col gap-1 text-sm text-ink-soft">
+            Email
+            <input
+              type="email"
+              required
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
+              className="rounded-md border border-border px-3 py-2 text-sm text-ink outline-none focus:border-horizon"
+            />
+          </label>
+
+          <label className="flex flex-col gap-1 text-sm text-ink-soft">
+            Password
+            <input
+              type="password"
+              required
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              className="rounded-md border border-border px-3 py-2 text-sm text-ink outline-none focus:border-horizon"
+            />
+          </label>
+
+          {error && <p className="text-sm text-tangerine">{error}</p>}
+
+          <button
+            type="submit"
+            disabled={loading}
+            className="rounded-md bg-horizon px-4 py-2 text-sm font-medium text-white hover:bg-horizon-dark disabled:opacity-50"
+          >
+            {loading ? "Signing in..." : "Sign in"}
+          </button>
+        </form>
+      </div>
     </div>
   );
 }

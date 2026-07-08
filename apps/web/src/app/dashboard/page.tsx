@@ -6,16 +6,17 @@ import Link from "next/link";
 import type { Session } from "@supabase/supabase-js";
 import { supabase } from "@/lib/supabase";
 import { Article, isInProgress, listArticles, startArticle } from "@/lib/api";
+import { Logo } from "@/components/Logo";
 
 const STATUS_STYLES: Record<string, string> = {
-  researching: "bg-zinc-100 text-zinc-700",
-  proposed: "bg-zinc-100 text-zinc-700",
-  drafting: "bg-blue-100 text-blue-700",
-  reviewing: "bg-blue-100 text-blue-700",
-  awaiting_approval: "bg-amber-100 text-amber-800",
-  approved: "bg-green-100 text-green-800",
-  archived: "bg-zinc-100 text-zinc-500",
-  failed: "bg-red-100 text-red-700",
+  researching: "bg-ink/5 text-ink-soft",
+  proposed: "bg-ink/5 text-ink-soft",
+  drafting: "bg-horizon/10 text-horizon",
+  reviewing: "bg-horizon/10 text-horizon",
+  awaiting_approval: "bg-gold/15 text-gold-dark",
+  approved: "bg-peppermint/10 text-peppermint",
+  archived: "bg-ink/5 text-ink-soft",
+  failed: "bg-tangerine/10 text-tangerine",
 };
 
 const FILTERS = [
@@ -98,14 +99,17 @@ export default function DashboardPage() {
   const visibleArticles = articles.filter((a) => matchesFilter(a, filter));
 
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50">
-      <header className="flex items-center justify-between border-b border-zinc-200 bg-white px-8 py-4">
-        <h1 className="text-lg font-semibold text-zinc-900">Broono SEO Pipeline</h1>
-        <div className="flex items-center gap-4 text-sm text-zinc-600">
+    <div className="flex flex-1 flex-col bg-cream">
+      <header className="flex items-center justify-between border-b border-border bg-white px-8 py-4">
+        <div className="flex items-center gap-3">
+          <Logo />
+          <span className="text-sm text-ink-soft">SEO Pipeline</span>
+        </div>
+        <div className="flex items-center gap-4 text-sm text-ink-soft">
           <span>{session?.user.email}</span>
           <button
             onClick={handleSignOut}
-            className="rounded-md border border-zinc-300 px-3 py-1.5 hover:bg-zinc-100"
+            className="rounded-md border border-border px-3 py-1.5 hover:bg-cream"
           >
             Sign out
           </button>
@@ -115,26 +119,26 @@ export default function DashboardPage() {
       <main className="mx-auto w-full max-w-4xl flex-1 px-6 py-8">
         <form
           onSubmit={handleStart}
-          className="mb-8 flex gap-3 rounded-lg border border-zinc-200 bg-white p-4"
+          className="mb-8 flex gap-3 rounded-lg border border-border bg-white p-4"
         >
           <input
             type="text"
             placeholder="Optional topic seed (leave blank to let research agent decide)"
             value={topicSeed}
             onChange={(e) => setTopicSeed(e.target.value)}
-            className="flex-1 rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+            className="flex-1 rounded-md border border-border px-3 py-2 text-sm text-ink outline-none focus:border-horizon"
           />
           <button
             type="submit"
             disabled={starting}
-            className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700 disabled:opacity-50"
+            className="rounded-md bg-horizon px-4 py-2 text-sm font-medium text-white hover:bg-horizon-dark disabled:opacity-50"
           >
             {starting ? "Starting..." : "Start new article"}
           </button>
         </form>
 
         {error && (
-          <p className="mb-4 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+          <p className="mb-4 rounded-md bg-tangerine/10 px-3 py-2 text-sm text-tangerine">
             {error}
           </p>
         )}
@@ -146,8 +150,8 @@ export default function DashboardPage() {
               onClick={() => setFilter(f.key)}
               className={`rounded-full px-3 py-1.5 text-sm font-medium ${
                 filter === f.key
-                  ? "bg-zinc-900 text-white"
-                  : "bg-white text-zinc-600 border border-zinc-200 hover:bg-zinc-100"
+                  ? "bg-ink text-white"
+                  : "bg-white text-ink-soft border border-border hover:bg-cream"
               }`}
             >
               {f.label}
@@ -155,30 +159,30 @@ export default function DashboardPage() {
           ))}
         </div>
 
-        <div className="overflow-hidden rounded-lg border border-zinc-200 bg-white">
+        <div className="overflow-hidden rounded-lg border border-border bg-white">
           {visibleArticles.length === 0 ? (
-            <p className="p-8 text-center text-sm text-zinc-500">
+            <p className="p-8 text-center text-sm text-ink-soft">
               No articles here yet.
             </p>
           ) : (
-            <ul className="divide-y divide-zinc-100">
+            <ul className="divide-y divide-border">
               {visibleArticles.map((article) => (
                 <li key={article.id}>
                   <Link
                     href={`/articles/${article.id}`}
-                    className="flex items-center justify-between gap-4 px-5 py-4 hover:bg-zinc-50"
+                    className="flex items-center justify-between gap-4 px-5 py-4 hover:bg-cream"
                   >
                     <div className="min-w-0">
-                      <p className="truncate text-sm font-medium text-zinc-900">
+                      <p className="truncate text-sm font-medium text-ink">
                         {article.brief_json?.title || "Untitled (research in progress)"}
                       </p>
-                      <p className="truncate text-xs text-zinc-500">
+                      <p className="truncate text-xs text-ink-soft">
                         {article.brief_json?.target_keyword || "No keyword yet"}
                       </p>
                     </div>
                     <span
                       className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
-                        STATUS_STYLES[article.status] || "bg-zinc-100 text-zinc-700"
+                        STATUS_STYLES[article.status] || "bg-ink/5 text-ink-soft"
                       }`}
                     >
                       {article.status.replace("_", " ")}

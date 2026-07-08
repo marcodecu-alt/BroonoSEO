@@ -19,30 +19,31 @@ import {
   getArticleTimeline,
   isInProgress,
 } from "@/lib/api";
+import { Logo } from "@/components/Logo";
 
 function ChecklistRow({ label, item }: { label: string; item: ChecklistItem }) {
   return (
     <div className="flex items-start gap-3 py-2">
       <span
         className={`mt-0.5 flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-xs font-bold ${
-          item.passed ? "bg-green-100 text-green-700" : "bg-red-100 text-red-700"
+          item.passed ? "bg-peppermint/10 text-peppermint" : "bg-tangerine/10 text-tangerine"
         }`}
       >
         {item.passed ? "✓" : "✕"}
       </span>
       <div>
-        <p className="text-sm font-medium text-zinc-900">{label}</p>
-        <p className="text-sm text-zinc-600">{item.note}</p>
+        <p className="text-sm font-medium text-ink">{label}</p>
+        <p className="text-sm text-ink-soft">{item.note}</p>
       </div>
     </div>
   );
 }
 
 const AGENT_DOT: Record<TimelineStep["agent"], string> = {
-  research_node: "bg-purple-500",
-  propose_node: "bg-amber-500",
-  draft_node: "bg-blue-500",
-  review_node: "bg-green-500",
+  research_node: "bg-horizon",
+  propose_node: "bg-gold",
+  draft_node: "bg-ink-soft",
+  review_node: "bg-peppermint",
 };
 
 function TimelineStepCard({ step }: { step: TimelineStep }) {
@@ -52,8 +53,8 @@ function TimelineStepCard({ step }: { step: TimelineStep }) {
         className={`absolute left-0 top-1.5 h-2.5 w-2.5 rounded-full ${AGENT_DOT[step.agent]}`}
       />
       <div className="mb-1 flex items-center justify-between">
-        <p className="text-sm font-semibold text-zinc-900">{agentLabel(step.agent)}</p>
-        <p className="text-xs text-zinc-400">
+        <p className="text-sm font-semibold text-ink">{agentLabel(step.agent)}</p>
+        <p className="text-xs text-ink-soft/70">
           {new Date(step.created_at).toLocaleString()}
         </p>
       </div>
@@ -61,46 +62,46 @@ function TimelineStepCard({ step }: { step: TimelineStep }) {
       {step.agent === "research_node" && (
         <ul className="space-y-2">
           {step.output.candidates.map((c, i) => (
-            <li key={i} className="rounded-md bg-zinc-50 p-3 text-sm">
-              <p className="font-medium text-zinc-900">{c.topic}</p>
-              <p className="text-xs text-zinc-500">keyword: {c.target_keyword}</p>
-              <p className="mt-1 text-zinc-600">{c.rationale}</p>
+            <li key={i} className="rounded-md bg-cream p-3 text-sm">
+              <p className="font-medium text-ink">{c.topic}</p>
+              <p className="text-xs text-ink-soft">keyword: {c.target_keyword}</p>
+              <p className="mt-1 text-ink-soft">{c.rationale}</p>
             </li>
           ))}
         </ul>
       )}
 
       {step.agent === "propose_node" && (
-        <div className="rounded-md bg-zinc-50 p-3 text-sm">
-          <p className="font-medium text-zinc-900">{step.output.title}</p>
-          <p className="text-xs text-zinc-500">
+        <div className="rounded-md bg-cream p-3 text-sm">
+          <p className="font-medium text-ink">{step.output.title}</p>
+          <p className="text-xs text-ink-soft">
             keyword: {step.output.target_keyword} · product: {step.output.tied_product}
           </p>
-          <p className="mt-1 text-zinc-600">{step.output.angle}</p>
+          <p className="mt-1 text-ink-soft">{step.output.angle}</p>
         </div>
       )}
 
       {step.agent === "draft_node" && (
-        <div className="rounded-md bg-zinc-50 p-3 text-sm">
-          <p className="mb-1 text-xs text-zinc-500">
+        <div className="rounded-md bg-cream p-3 text-sm">
+          <p className="mb-1 text-xs text-ink-soft">
             v{step.output.version_number} · {step.output.created_by.replace("_", " ")}
           </p>
-          <p className="line-clamp-3 whitespace-pre-line text-zinc-600">
+          <p className="line-clamp-3 whitespace-pre-line text-ink-soft">
             {step.output.content}
           </p>
         </div>
       )}
 
       {step.agent === "review_node" && (
-        <div className="rounded-md bg-zinc-50 p-3 text-sm">
+        <div className="rounded-md bg-cream p-3 text-sm">
           <p
             className={`mb-2 font-medium ${
-              step.output.passed ? "text-green-700" : "text-red-700"
+              step.output.passed ? "text-peppermint" : "text-tangerine"
             }`}
           >
             {step.output.passed ? "Passed" : "Failed"}
           </p>
-          <div className="space-y-1 text-xs text-zinc-600">
+          <div className="space-y-1 text-xs text-ink-soft">
             <p>
               health claims: {step.output.checklist.health_claims.note}
             </p>
@@ -128,16 +129,20 @@ export default function ArticleDetailPage() {
   const [approving, setApproving] = useState(false);
 
   const refresh = useCallback(async () => {
+    // Independent fetches: a timeline failure shouldn't block the draft/checklist
+    // from loading, and vice versa.
     try {
-      const [data, steps] = await Promise.all([
-        getArticle(params.id),
-        getArticleTimeline(params.id),
-      ]);
+      const data = await getArticle(params.id);
       setDetail(data);
-      setTimeline(steps);
       setError(null);
     } catch {
       setError("Couldn't load this article.");
+    }
+    try {
+      const steps = await getArticleTimeline(params.id);
+      setTimeline(steps);
+    } catch {
+      // Timeline is supplementary; leave it empty and let the tab say so.
     }
   }, [params.id]);
 
@@ -209,11 +214,11 @@ export default function ArticleDetailPage() {
 
   if (!checked || !detail) {
     return (
-      <div className="flex flex-1 items-center justify-center bg-zinc-50">
+      <div className="flex flex-1 items-center justify-center bg-cream">
         {error ? (
-          <p className="text-sm text-red-600">{error}</p>
+          <p className="text-sm text-tangerine">{error}</p>
         ) : (
-          <p className="text-sm text-zinc-500">Loading...</p>
+          <p className="text-sm text-ink-soft">Loading...</p>
         )}
       </div>
     );
@@ -224,21 +229,26 @@ export default function ArticleDetailPage() {
   const inProgress = isInProgress(article.status);
 
   return (
-    <div className="flex flex-1 flex-col bg-zinc-50">
-      <header className="flex items-center justify-between border-b border-zinc-200 bg-white px-8 py-4">
-        <Link href="/dashboard" className="text-sm text-zinc-500 hover:text-zinc-900">
-          ← Dashboard
-        </Link>
-        <span className="text-sm text-zinc-600">{session?.user.email}</span>
+    <div className="flex flex-1 flex-col bg-cream">
+      <header className="flex items-center justify-between border-b border-border bg-white px-8 py-4">
+        <div className="flex items-center gap-4">
+          <Link href="/dashboard">
+            <Logo className="h-5 w-auto" />
+          </Link>
+          <Link href="/dashboard" className="text-sm text-ink-soft hover:text-ink">
+            ← Dashboard
+          </Link>
+        </div>
+        <span className="text-sm text-ink-soft">{session?.user.email}</span>
       </header>
 
       <main className="mx-auto grid w-full max-w-5xl flex-1 grid-cols-1 gap-6 px-6 py-8 lg:grid-cols-[1fr_320px]">
-        <div className="min-w-0 rounded-lg border border-zinc-200 bg-white p-8">
+        <div className="min-w-0 rounded-lg border border-border bg-white p-8">
           <div className="mb-4 flex items-center justify-between">
-            <h1 className="text-xl font-semibold text-zinc-900">
+            <h1 className="text-xl font-semibold text-ink">
               {article.brief_json?.title || "Untitled"}
             </h1>
-            <span className="shrink-0 rounded-full bg-zinc-100 px-2.5 py-1 text-xs font-medium text-zinc-700">
+            <span className="shrink-0 rounded-full bg-ink/5 px-2.5 py-1 text-xs font-medium text-ink-soft">
               {article.status.replace("_", " ")}
             </span>
           </div>
@@ -246,10 +256,10 @@ export default function ArticleDetailPage() {
           <p
             className={`mb-4 rounded-md px-3 py-2 text-sm ${
               article.status === "failed"
-                ? "bg-red-50 text-red-700"
+                ? "bg-tangerine/10 text-tangerine"
                 : inProgress
-                ? "bg-blue-50 text-blue-700"
-                : "bg-zinc-50 text-zinc-600"
+                ? "bg-horizon/10 text-horizon"
+                : "bg-cream text-ink-soft"
             }`}
           >
             {currentStageLabel(article.status)}
@@ -257,19 +267,19 @@ export default function ArticleDetailPage() {
           </p>
 
           {article.status === "failed" && article.error_message && (
-            <div className="mb-6 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+            <div className="mb-6 rounded-md bg-tangerine/10 px-3 py-2 text-sm text-tangerine">
               <p className="font-medium">Error details:</p>
               <p className="mt-1">{article.error_message}</p>
             </div>
           )}
 
-          <div className="mb-6 flex gap-1 border-b border-zinc-200">
+          <div className="mb-6 flex gap-1 border-b border-border">
             <button
               onClick={() => setActiveTab("draft")}
               className={`px-3 py-2 text-sm font-medium ${
                 activeTab === "draft"
-                  ? "border-b-2 border-zinc-900 text-zinc-900"
-                  : "text-zinc-500 hover:text-zinc-700"
+                  ? "border-b-2 border-ink text-ink"
+                  : "text-ink-soft hover:text-ink"
               }`}
             >
               Draft
@@ -278,8 +288,8 @@ export default function ArticleDetailPage() {
               onClick={() => setActiveTab("timeline")}
               className={`px-3 py-2 text-sm font-medium ${
                 activeTab === "timeline"
-                  ? "border-b-2 border-zinc-900 text-zinc-900"
-                  : "text-zinc-500 hover:text-zinc-700"
+                  ? "border-b-2 border-ink text-ink"
+                  : "text-ink-soft hover:text-ink"
               }`}
             >
               Timeline ({timeline.length})
@@ -288,18 +298,18 @@ export default function ArticleDetailPage() {
 
           {activeTab === "draft" &&
             (latest_version ? (
-              <article className="prose prose-zinc max-w-none prose-headings:font-semibold">
+              <article className="prose prose-zinc max-w-none prose-headings:font-semibold prose-headings:text-ink prose-a:text-horizon">
                 <ReactMarkdown>{latest_version.content}</ReactMarkdown>
               </article>
             ) : (
-              <p className="text-sm text-zinc-500">No draft yet.</p>
+              <p className="text-sm text-ink-soft">No draft yet.</p>
             ))}
 
           {activeTab === "timeline" &&
             (timeline.length === 0 ? (
-              <p className="text-sm text-zinc-500">No steps yet.</p>
+              <p className="text-sm text-ink-soft">No steps yet.</p>
             ) : (
-              <div className="space-y-6 border-l border-zinc-200 pl-1">
+              <div className="space-y-6 border-l border-border pl-1">
                 {timeline.map((step, i) => (
                   <TimelineStepCard key={i} step={step} />
                 ))}
@@ -308,17 +318,17 @@ export default function ArticleDetailPage() {
         </div>
 
         <div className="flex flex-col gap-6">
-          <div className="rounded-lg border border-zinc-200 bg-white p-5">
-            <h2 className="mb-3 text-sm font-semibold text-zinc-900">Review checklist</h2>
+          <div className="rounded-lg border border-border bg-white p-5">
+            <h2 className="mb-3 text-sm font-semibold text-ink">Review checklist</h2>
             {latestReview ? (
-              <div className="divide-y divide-zinc-100">
+              <div className="divide-y divide-border">
                 <ChecklistRow label="Health claims" item={latestReview.checklist_json.health_claims} />
                 <ChecklistRow label="Tone" item={latestReview.checklist_json.tone} />
                 <ChecklistRow label="SEO basics" item={latestReview.checklist_json.seo_basics} />
                 <ChecklistRow label="Duplication" item={latestReview.checklist_json.duplication} />
               </div>
             ) : (
-              <p className="text-sm text-zinc-500">No review yet.</p>
+              <p className="text-sm text-ink-soft">No review yet.</p>
             )}
           </div>
 
@@ -326,7 +336,7 @@ export default function ArticleDetailPage() {
             <button
               onClick={handleApprove}
               disabled={approving}
-              className="rounded-md bg-green-600 px-4 py-2 text-sm font-medium text-white hover:bg-green-700 disabled:opacity-50"
+              className="rounded-md bg-peppermint px-4 py-2 text-sm font-medium text-white hover:opacity-90 disabled:opacity-50"
             >
               {approving ? "Approving..." : "Approve"}
             </button>
@@ -335,17 +345,17 @@ export default function ArticleDetailPage() {
           {article.status === "approved" && (
             <button
               onClick={handleExport}
-              className="rounded-md bg-zinc-900 px-4 py-2 text-sm font-medium text-white hover:bg-zinc-700"
+              className="rounded-md bg-horizon px-4 py-2 text-sm font-medium text-white hover:bg-horizon-dark"
             >
               Export Markdown
             </button>
           )}
 
-          <div className="rounded-lg border border-zinc-200 bg-white p-5">
-            <h2 className="mb-3 text-sm font-semibold text-zinc-900">
+          <div className="rounded-lg border border-border bg-white p-5">
+            <h2 className="mb-3 text-sm font-semibold text-ink">
               Version history ({versions.length})
             </h2>
-            <ul className="space-y-1 text-sm text-zinc-600">
+            <ul className="space-y-1 text-sm text-ink-soft">
               {versions.map((v) => (
                 <li key={v.id}>
                   v{v.version_number} — {v.created_by.replace("_", " ")}
@@ -354,14 +364,14 @@ export default function ArticleDetailPage() {
             </ul>
           </div>
 
-          <div className="rounded-lg border border-zinc-200 bg-white p-5">
-            <h2 className="mb-3 text-sm font-semibold text-zinc-900">Comments</h2>
+          <div className="rounded-lg border border-border bg-white p-5">
+            <h2 className="mb-3 text-sm font-semibold text-ink">Comments</h2>
             <ul className="mb-4 space-y-3 text-sm">
               {comments.length === 0 && (
-                <li className="text-zinc-500">No comments yet.</li>
+                <li className="text-ink-soft">No comments yet.</li>
               )}
               {comments.map((c) => (
-                <li key={c.id} className="rounded-md bg-zinc-50 p-3 text-zinc-700">
+                <li key={c.id} className="rounded-md bg-cream p-3 text-ink-soft">
                   {c.comment_text}
                 </li>
               ))}
@@ -372,12 +382,12 @@ export default function ArticleDetailPage() {
                 onChange={(e) => setCommentText(e.target.value)}
                 placeholder="Leave feedback to trigger a revision..."
                 rows={3}
-                className="rounded-md border border-zinc-300 px-3 py-2 text-sm outline-none focus:border-zinc-500"
+                className="rounded-md border border-border px-3 py-2 text-sm text-ink outline-none focus:border-horizon"
               />
               <button
                 type="submit"
                 disabled={submittingComment || !commentText.trim()}
-                className="self-end rounded-md border border-zinc-300 px-3 py-1.5 text-sm hover:bg-zinc-100 disabled:opacity-50"
+                className="self-end rounded-md border border-border px-3 py-1.5 text-sm text-ink-soft hover:bg-cream disabled:opacity-50"
               >
                 {submittingComment ? "Sending..." : "Send"}
               </button>

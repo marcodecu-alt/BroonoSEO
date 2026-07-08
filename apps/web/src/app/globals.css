@@ -1,27 +1,52 @@
 @import "tailwindcss";
 @plugin "@tailwindcss/typography";
 
+/* Broono brand palette, pulled from broono.pet's own design tokens
+   (--color-ink, --color-horizon-blue, --color-oatmilk, etc. in their
+   Shopify theme CSS). */
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --background: #f5f3ef;
+  --foreground: #03183f;
+
+  --color-brand-ink: #03183f;
+  --color-brand-ink-soft: #244064;
+  --color-brand-blue: #0559c6;
+  --color-brand-blue-dark: #0240aa;
+  --color-brand-blue-light: #93b8e2;
+  --color-brand-cream: #f5f3ef;
+  --color-brand-oatmilk: #fff7e6;
+  --color-brand-gold: #d9a441;
+  --color-brand-gold-dark: #8a6423;
+  --color-brand-green: #079b72;
+  --color-brand-orange: #e06014;
+  --color-brand-border: #e5e1d8;
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
+  --color-ink: var(--color-brand-ink);
+  --color-ink-soft: var(--color-brand-ink-soft);
+  /* Named "horizon"/"peppermint"/"tangerine" (Broono's own token family
+     names) instead of "blue"/"green"/"orange" — those collide with
+     Tailwind's built-in color scales and silently fail to generate
+     plain bg-blue/bg-green/bg-orange utilities. */
+  --color-horizon: var(--color-brand-blue);
+  --color-horizon-dark: var(--color-brand-blue-dark);
+  --color-horizon-light: var(--color-brand-blue-light);
+  --color-cream: var(--color-brand-cream);
+  --color-oatmilk: var(--color-brand-oatmilk);
+  --color-gold: var(--color-brand-gold);
+  --color-gold-dark: var(--color-brand-gold-dark);
+  --color-peppermint: var(--color-brand-green);
+  --color-tangerine: var(--color-brand-orange);
+  --color-border: var(--color-brand-border);
   --font-sans: var(--font-geist-sans);
   --font-mono: var(--font-geist-mono);
-}
-
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-sans), Arial, Helvetica, sans-serif;
 }
