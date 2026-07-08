@@ -1,3 +1,5 @@
+import os
+
 from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from fastapi.responses import PlainTextResponse
@@ -8,9 +10,17 @@ from .supabase_client import supabase
 
 app = FastAPI(title="Broono SEO Pipeline API")
 
+# ALLOWED_ORIGINS is a comma-separated list, e.g. "https://broono-seo.vercel.app".
+# Defaults to local dev only.
+allowed_origins = [
+    origin.strip()
+    for origin in os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000").split(",")
+    if origin.strip()
+]
+
 app.add_middleware(
     CORSMiddleware,
-    allow_origins=["http://localhost:3000"],
+    allow_origins=allowed_origins,
     allow_methods=["*"],
     allow_headers=["*"],
 )

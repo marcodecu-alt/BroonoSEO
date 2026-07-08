@@ -103,6 +103,32 @@ cp .env.example .env   # fill in ANTHROPIC_API_KEY, SUPABASE_URL, SUPABASE_SERVI
 ./venv/Scripts/python -m uvicorn app.main:app --reload --port 8000
 ```
 
+## Deployment
+
+Repo: https://github.com/marcodecu-alt/BroonoSEO
+
+**Backend (`apps/api`) → Railway.** Needs a host that supports a long-running process,
+not a serverless function, because `POST /articles/start` kicks off a background task
+(web search, several Claude calls, can run 1-3+ minutes) that keeps running after the
+HTTP response is sent. Vercel/serverless functions get killed once the response returns,
+so the frontend can't host this part.
+
+1. Connect the GitHub repo in Railway, set the service's root directory to `apps/api`
+2. Railway picks up `Procfile` (`uvicorn app.main:app --host 0.0.0.0 --port $PORT`) and
+   `.python-version` automatically via Nixpacks
+3. Set env vars: `ANTHROPIC_API_KEY`, `SUPABASE_URL`, `SUPABASE_SERVICE_ROLE_KEY`,
+   `ALLOWED_ORIGINS` (the deployed Vercel URL, comma-separated if more than one)
+4. Note the public URL Railway gives the service, needed for the frontend's
+   `NEXT_PUBLIC_API_URL` below
+
+**Frontend (`apps/web`) → Vercel.**
+
+1. Connect the same GitHub repo in Vercel, set the project's root directory to `apps/web`
+2. Set env vars: `NEXT_PUBLIC_SUPABASE_URL`, `NEXT_PUBLIC_SUPABASE_ANON_KEY` (same values
+   as local `.env.local`), `NEXT_PUBLIC_API_URL` (the Railway URL from above)
+3. Once deployed, take the Vercel URL and set it as `ALLOWED_ORIGINS` on Railway (step 3
+   above), redeploy the backend so CORS allows the production frontend
+
 ## Status
 
 End-to-end functional. Supabase schema, auth, and all 4 LangGraph nodes are wired to real Claude API calls (web search for research, web fetch for style reference in drafting). The full pipeline, the review→draft loop, human comments, approval, and export have all been verified against the live API/Supabase, including a real run through the frontend in a browser (login → dashboard → article detail → approve → export).
