@@ -2,6 +2,8 @@ from fastapi import FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from pydantic import BaseModel
 
+from .supabase_client import supabase
+
 app = FastAPI(title="Broono SEO Pipeline API")
 
 app.add_middleware(
@@ -34,14 +36,57 @@ def start_article(body: StartArticleRequest):
 
 @app.get("/articles")
 def list_articles():
-    # TODO: read from Supabase articles table
-    return []
+    resp = (
+        supabase.table("articles")
+        .select("*")
+        .order("updated_at", desc=True)
+        .execute()
+    )
+    return resp.data
 
 
 @app.get("/articles/{article_id}")
 def get_article(article_id: str):
-    # TODO: read article + latest draft + review notes + comments from Supabase
-    raise HTTPException(status_code=501, detail="not implemented")
+    article_resp = (
+        supabase.table("articles").select("*").eq("id", article_id).execute()
+    )
+    if not article_resp.data:
+        raise HTTPException(status_code=404, detail="article not found")
+    article = article_resp.data[0]
+
+    versions_resp = (
+        supabase.table("article_versions")
+        .select("*")
+        .eq("article_id", article_id)
+        .order("version_number", desc=True)
+        .execute()
+    )
+    versions = versions_resp.data
+    latest_version = versions[0] if versions else None
+
+    review_notes_resp = (
+        supabase.table("review_notes")
+        .select("*")
+        .eq("article_id", article_id)
+        .order("created_at", desc=True)
+        .execute()
+    )
+
+    comments_resp = (
+        supabase.table("comments")
+        .select("*")
+        .eq("article_id", article_id)
+        .order("created_at")
+        .execute()
+    )
+
+    return {
+        "article": article,
+        "latest_version": latest_version,
+        "versions": versions,
+        "review_notes": review_notes_resp.data,
+        "comments": comments_resp.data,
+    }
 
 
 @app.post("/articles/{article_id}/approve")
