@@ -7,6 +7,35 @@ from ..supabase_client import supabase
 from .state import PipelineState
 
 
+# Broono's real, complete product catalog (broono.pet/collections/all has exactly
+# these 3, verified directly against the live site). Kept as a code-level lookup,
+# not something either agent has to guess or fetch, so the product link in every
+# article is always accurate.
+PRODUCTS = {
+    "move": {
+        "name": "Move",
+        "url": "https://www.broono.pet/products/move",
+        "description": "Joint care for active and ageing dogs, supports joint comfort, "
+        "flexible movement, and cartilage care.",
+        "topic_keywords": ["joint", "mobility", "stiff", "cartilage"],
+    },
+    "calm": {
+        "name": "Calm",
+        "url": "https://www.broono.pet/products/calm",
+        "description": "Soft chews with adaptogens and magnesium, supports calmer "
+        "behaviour, relaxed mood, and anxiety support without drowsiness.",
+        "topic_keywords": ["calm", "anxiety", "relax", "magnesium", "theanine"],
+    },
+    "prebiotic": {
+        "name": "Prebiotic",
+        "url": "https://www.broono.pet/products/prebiotic",
+        "description": "Soft chews that nourish beneficial gut bacteria, supports "
+        "digestion, healthy skin, and immune function.",
+        "topic_keywords": ["gut", "digest", "skin", "immune", "prebiotic"],
+    },
+}
+
+
 def _domain(url: str) -> str:
     return urlparse(url).netloc.removeprefix("www.")
 
@@ -112,10 +141,10 @@ def _pick_style_reference_urls(tied_product: str, n: int = 1) -> list[str]:
     if not articles:
         return []
 
-    keywords = tied_product.lower().split("/")
+    keywords = PRODUCTS.get(tied_product, {}).get("topic_keywords", [])
     matches = [
         a for a in articles
-        if any(k.strip() and k.strip() in (a.get("summary") or "").lower() for k in keywords)
+        if any(k in (a.get("summary") or "").lower() for k in keywords)
     ]
 
     chosen = (matches or articles)[:n]
@@ -215,12 +244,18 @@ You'll be given a shortlist of research candidates, each with a topic, target ke
 rationale. Select the single strongest candidate, the one with the clearest search demand and \
 the best content gap, and turn it into a concrete content brief.
 
+Broono sells exactly 3 products. Pick whichever one genuinely fits the candidate's topic, don't \
+force a fit if none really do, pick the closest one:
+- move: joint care for active/ageing dogs, joint comfort, flexible movement, cartilage care
+- calm: soft chews with adaptogens + magnesium, calmer behaviour, relaxed mood, anxiety support
+- prebiotic: soft chews that nourish gut bacteria, supports digestion, healthy skin, and immune \
+function
+
 Output:
 - title: a compelling working title in Broono's blog voice (plain, helpful, not clickbait)
 - target_keyword: the primary SEO keyword to write for
 - angle: one or two sentences on the specific entry point/angle the article will take
-- tied_product: which Broono supplement category this ties back to (e.g. joint/mobility, \
-digestive, skin/coat, calming, immune support), inferred from the candidate's rationale"""
+- tied_product: exactly one of "move", "calm", or "prebiotic", whichever genuinely fits the topic"""
 
 PROPOSE_OUTPUT_SCHEMA = {
     "type": "object",
@@ -228,7 +263,7 @@ PROPOSE_OUTPUT_SCHEMA = {
         "title": {"type": "string"},
         "target_keyword": {"type": "string"},
         "angle": {"type": "string"},
-        "tied_product": {"type": "string"},
+        "tied_product": {"type": "string", "enum": ["move", "calm", "prebiotic"]},
     },
     "required": ["title", "target_keyword", "angle", "tied_product"],
     "additionalProperties": False,
@@ -283,7 +318,10 @@ the target keyword near the front. No clickbait, no generic "Benefits of X" fram
 - Proper H2/H3 structure
 - A short FAQ section near the end (2-3 Q&As, or up to 4 only if the word budget allows) if \
 relevant to the topic, matching the pattern in Broono's existing content
-- A natural, non-pushy mention of the tied Broono product category near the end
+- Near the end, a natural, non-pushy sentence or two that connects what the article covered to \
+the specific Broono product you're given, written as a markdown link using its exact name and \
+URL, e.g. "a daily [Broono Calm](https://www.broono.pet/products/calm) chew". Make the \
+connection specific to this article's topic, not a generic tack-on.
 
 Include image briefs so a human can generate or source real images later: one immediately after \
 the meta description (the hero image), and optionally one more at a natural point in the body if \
@@ -303,9 +341,8 @@ Do not include any health/medical claims that aren't well established and safe t
 supplement brand (e.g. don't claim to cure, treat, or diagnose disease; recommend vets for \
 anything that sounds like a medical emergency or persistent symptom).
 
-Refer to the tied product only by its general category from the brief (e.g. "a joint support \
-supplement" or "a daily joint chew"). Do not invent a specific product name, price, or URL, we \
-don't have Broono's exact product catalog wired in yet.
+Use only the exact product name and URL given to you for the link. Do not invent a price, don't \
+link to a different Broono product, and don't make up a different URL.
 
 If revision notes are provided, treat them as required changes to the previous draft, not \
 suggestions.
@@ -321,9 +358,12 @@ def draft_node(state: PipelineState) -> PipelineState:
     brief = state.get("brief", {})
     revision_notes = state.get("revision_notes")
     reference_urls = _pick_style_reference_urls(brief.get("tied_product", ""))
+    product = PRODUCTS.get(brief.get("tied_product", ""), {})
 
     user_content = (
         f"Brief:\n{json.dumps(brief, indent=2)}\n\n"
+        f"Tied product (use this exact name and URL for the product link):\n"
+        f"{json.dumps(product, indent=2)}\n\n"
         f"Style reference articles:\n" + "\n".join(reference_urls or ["(none indexed yet)"])
     )
     if revision_notes:
