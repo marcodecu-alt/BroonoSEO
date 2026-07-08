@@ -226,11 +226,18 @@ formatting conventions (they tend to be practical, warm, non-alarmist, and end w
 tie-in to a Broono product without being pushy).
 
 Write the complete article in Markdown:
-- A single H1 title
+- Target length: 900-1,200 words. Be direct and comprehensive, not padded, cut anything that \
+doesn't serve the reader's actual question.
+- Answer the core question in the first 2-3 sentences, before any scene-setting. Someone \
+searching a symptom wants the answer fast.
+- Open with a specific, concrete, recognizable scenario the reader will immediately recognize \
+themselves in, never a generic statement like "As a dog owner, you may have noticed...".
+- A single H1 title in plain language, centered on the reader's exact question or concern, with \
+the target keyword near the front. No clickbait, no generic "Benefits of X" framing.
 - A one-sentence meta description near the top, labeled "Meta description:"
 - Proper H2/H3 structure
-- A short FAQ section near the end (2-4 Q&As) if relevant to the topic, matching the pattern in \
-Broono's existing content
+- A short FAQ section near the end (2-3 Q&As, or up to 4 only if the word budget allows) if \
+relevant to the topic, matching the pattern in Broono's existing content
 - A natural, non-pushy mention of the tied Broono product category near the end
 
 Do not include any health/medical claims that aren't well established and safe to state for a \
