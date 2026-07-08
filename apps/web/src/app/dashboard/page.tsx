@@ -15,6 +15,7 @@ const STATUS_STYLES: Record<string, string> = {
   awaiting_approval: "bg-amber-100 text-amber-800",
   approved: "bg-green-100 text-green-800",
   archived: "bg-zinc-100 text-zinc-500",
+  failed: "bg-red-100 text-red-700",
 };
 
 const FILTERS = [

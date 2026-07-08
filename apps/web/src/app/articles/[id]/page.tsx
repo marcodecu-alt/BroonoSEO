@@ -164,6 +164,13 @@ export default function ArticleDetailPage() {
             </p>
           )}
 
+          {article.status === "failed" && (
+            <div className="mb-6 rounded-md bg-red-50 px-3 py-2 text-sm text-red-700">
+              <p className="font-medium">Pipeline run failed.</p>
+              <p className="mt-1">{article.error_message || "No error details recorded."}</p>
+            </div>
+          )}
+
           {latest_version ? (
             <article className="prose prose-zinc max-w-none prose-headings:font-semibold">
               <ReactMarkdown>{latest_version.content}</ReactMarkdown>

@@ -36,4 +36,5 @@ class PipelineState(TypedDict, total=False):
         "awaiting_approval",
         "approved",
         "archived",
+        "failed",
     ]

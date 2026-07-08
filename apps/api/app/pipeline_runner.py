@@ -1,5 +1,9 @@
+import logging
+
 from .graph.graph import pipeline_graph, resume_pipeline_graph
 from .supabase_client import supabase
+
+logger = logging.getLogger(__name__)
 
 
 def _latest_version_number(article_id: str) -> int:
@@ -16,57 +20,68 @@ def _latest_version_number(article_id: str) -> int:
 
 def _persist_stream(article_id: str, stream, version_number: int):
     """Consume a LangGraph .stream(..., stream_mode='updates') iterator, persisting
-    each node's output to Supabase as it happens."""
+    each node's output to Supabase as it happens. Marks the article as failed with
+    the error message if anything raises, instead of silently hanging forever."""
     latest_version_id = None
 
-    for update in stream:
-        for node_name, partial in update.items():
-            if node_name == "research_node":
-                supabase.table("articles").update(
-                    {"status": "researching"}
-                ).eq("id", article_id).execute()
+    try:
+        for update in stream:
+            for node_name, partial in update.items():
+                if node_name == "research_node":
+                    supabase.table("articles").update(
+                        {"status": "researching"}
+                    ).eq("id", article_id).execute()
 
-            elif node_name == "propose_node":
-                supabase.table("articles").update(
-                    {"brief_json": partial["brief"], "status": "proposed"}
-                ).eq("id", article_id).execute()
+                elif node_name == "propose_node":
+                    supabase.table("articles").update(
+                        {"brief_json": partial["brief"], "status": "proposed"}
+                    ).eq("id", article_id).execute()
 
-            elif node_name == "draft_node":
-                version_number += 1
-                supabase.table("articles").update(
-                    {"status": "reviewing"}
-                ).eq("id", article_id).execute()
-                version_resp = (
-                    supabase.table("article_versions")
-                    .insert(
+                elif node_name == "draft_node":
+                    version_number += 1
+                    supabase.table("articles").update(
+                        {"status": "reviewing"}
+                    ).eq("id", article_id).execute()
+                    version_resp = (
+                        supabase.table("article_versions")
+                        .insert(
+                            {
+                                "article_id": article_id,
+                                "version_number": version_number,
+                                "content": partial["draft_content"],
+                                "created_by": "draft_agent",
+                            }
+                        )
+                        .execute()
+                    )
+                    latest_version_id = version_resp.data[0]["id"]
+
+                elif node_name == "review_node":
+                    passed = partial["review_passed"]
+                    supabase.table("review_notes").insert(
                         {
                             "article_id": article_id,
-                            "version_number": version_number,
-                            "content": partial["draft_content"],
-                            "created_by": "draft_agent",
+                            "version_id": latest_version_id,
+                            "checklist_json": partial["review_checklist"],
+                            "passed": passed,
                         }
-                    )
-                    .execute()
-                )
-                latest_version_id = version_resp.data[0]["id"]
-
-            elif node_name == "review_node":
-                passed = partial["review_passed"]
-                supabase.table("review_notes").insert(
-                    {
-                        "article_id": article_id,
-                        "version_id": latest_version_id,
-                        "checklist_json": partial["review_checklist"],
-                        "passed": passed,
-                    }
-                ).execute()
-                supabase.table("articles").update(
-                    {"status": "awaiting_approval" if passed else "drafting"}
-                ).eq("id", article_id).execute()
+                    ).execute()
+                    supabase.table("articles").update(
+                        {"status": "awaiting_approval" if passed else "drafting"}
+                    ).eq("id", article_id).execute()
+    except Exception as exc:
+        logger.exception("Pipeline run failed for article %s", article_id)
+        supabase.table("articles").update(
+            {"status": "failed", "error_message": str(exc)}
+        ).eq("id", article_id).execute()
 
 
 def run_pipeline_and_persist(article_id: str, topic_seed: str | None):
     """Full pipeline: research -> propose -> draft -> review (with loop)."""
+    supabase.table("articles").update({"error_message": None}).eq(
+        "id", article_id
+    ).execute()
+
     stream = pipeline_graph.stream(
         {"topic_seed": topic_seed},
         config={"recursion_limit": 25},
@@ -78,6 +93,10 @@ def run_pipeline_and_persist(article_id: str, topic_seed: str | None):
 def resume_pipeline_with_comment(article_id: str, comment_text: str):
     """Resume from draft_node with a human comment as revision context, reusing
     the same review->draft loop as an internal review failure."""
+    supabase.table("articles").update({"error_message": None}).eq(
+        "id", article_id
+    ).execute()
+
     article_resp = supabase.table("articles").select("brief_json").eq(
         "id", article_id
     ).execute()

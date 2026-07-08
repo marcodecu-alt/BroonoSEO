@@ -11,6 +11,7 @@ export type Article = {
   id: string;
   status: string;
   brief_json: Brief;
+  error_message: string | null;
   created_at: string;
   updated_at: string;
 };
