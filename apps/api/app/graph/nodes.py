@@ -12,6 +12,13 @@ from .state import PipelineState
 # not something either agent has to guess or fetch, so the product link in every
 # article is always accurate.
 PRODUCTS = {
+    "essential": {
+        "name": "Essential",
+        "url": "https://www.broono.pet/products/essential",
+        "description": "Daily foundational soft chew with antioxidants and B vitamins, "
+        "supports immune function, energy balance, and general healthspan.",
+        "topic_keywords": ["immune", "antioxidant", "energy", "general health", "wellness", "senior"],
+    },
     "move": {
         "name": "Move",
         "url": "https://www.broono.pet/products/move",
@@ -244,8 +251,10 @@ You'll be given a shortlist of research candidates, each with a topic, target ke
 rationale. Select the single strongest candidate, the one with the clearest search demand and \
 the best content gap, and turn it into a concrete content brief.
 
-Broono sells exactly 3 products. Pick whichever one genuinely fits the candidate's topic, don't \
+Broono sells exactly 4 products. Pick whichever one genuinely fits the candidate's topic, don't \
 force a fit if none really do, pick the closest one:
+- essential: daily foundational soft chew with antioxidants and B vitamins, supports immune \
+function, energy balance, and general healthspan
 - move: joint care for active/ageing dogs, joint comfort, flexible movement, cartilage care
 - calm: soft chews with adaptogens + magnesium, calmer behaviour, relaxed mood, anxiety support
 - prebiotic: soft chews that nourish gut bacteria, supports digestion, healthy skin, and immune \
@@ -255,7 +264,8 @@ Output:
 - title: a compelling working title in Broono's blog voice (plain, helpful, not clickbait)
 - target_keyword: the primary SEO keyword to write for
 - angle: one or two sentences on the specific entry point/angle the article will take
-- tied_product: exactly one of "move", "calm", or "prebiotic", whichever genuinely fits the topic"""
+- tied_product: exactly one of "essential", "move", "calm", or "prebiotic", whichever genuinely \
+fits the topic"""
 
 PROPOSE_OUTPUT_SCHEMA = {
     "type": "object",
@@ -263,7 +273,7 @@ PROPOSE_OUTPUT_SCHEMA = {
         "title": {"type": "string"},
         "target_keyword": {"type": "string"},
         "angle": {"type": "string"},
-        "tied_product": {"type": "string", "enum": ["move", "calm", "prebiotic"]},
+        "tied_product": {"type": "string", "enum": ["essential", "move", "calm", "prebiotic"]},
     },
     "required": ["title", "target_keyword", "angle", "tied_product"],
     "additionalProperties": False,
