@@ -240,6 +240,20 @@ the target keyword near the front. No clickbait, no generic "Benefits of X" fram
 relevant to the topic, matching the pattern in Broono's existing content
 - A natural, non-pushy mention of the tied Broono product category near the end
 
+Include image briefs so a human can generate or source real images later: one immediately after \
+the meta description (the hero image), and optionally one more at a natural point in the body if \
+it meaningfully helps illustrate a specific section (not required for every section, don't force \
+it). Format each one as its own line, exactly:
+
+> **Image brief:** <description>
+
+Each description must be a self-contained brief usable directly as a prompt for an AI image tool \
+or a brief for a photographer: specific subject (matched to this article's actual topic, not a \
+generic "a dog"), setting, mood, and a natural editorial photography style. Never describe \
+specific product packaging, labels, or branding, we don't have real product photography to match \
+against, so a generated image of fake packaging would be unusable. No text overlays in the \
+description, that's a separate design step.
+
 Do not include any health/medical claims that aren't well established and safe to state for a \
 supplement brand (e.g. don't claim to cure, treat, or diagnose disease; recommend vets for \
 anything that sounds like a medical emergency or persistent symptom).
