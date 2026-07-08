@@ -1,7 +1,7 @@
 from langgraph.graph import StateGraph, END
 
 from .state import PipelineState
-from .nodes import research_node, propose_node, draft_node, review_node, review_router
+from .nodes import research_node, propose_node, draft_node, review_node
 
 
 def build_graph():
@@ -16,21 +16,16 @@ def build_graph():
     graph.add_edge("research_node", "propose_node")
     graph.add_edge("propose_node", "draft_node")
     graph.add_edge("draft_node", "review_node")
-    graph.add_conditional_edges(
-        "review_node",
-        review_router,
-        {
-            "draft_node": "draft_node",
-            "awaiting_human_approval": END,
-        },
-    )
+    # review_node runs once and always hands off to the human, it never loops
+    # back to draft_node on its own. A human comment is the only thing that
+    # triggers another draft->review pass (see build_resume_graph).
+    graph.add_edge("review_node", END)
 
     return graph.compile()
 
 
 def build_resume_graph():
-    """Entry point at draft_node only, for resuming after a human comment. Reuses
-    the same review->draft loop edge as the full pipeline."""
+    """Entry point at draft_node only, for resuming after a human comment."""
     graph = StateGraph(PipelineState)
 
     graph.add_node("draft_node", draft_node)
@@ -38,14 +33,7 @@ def build_resume_graph():
 
     graph.set_entry_point("draft_node")
     graph.add_edge("draft_node", "review_node")
-    graph.add_conditional_edges(
-        "review_node",
-        review_router,
-        {
-            "draft_node": "draft_node",
-            "awaiting_human_approval": END,
-        },
-    )
+    graph.add_edge("review_node", END)
 
     return graph.compile()
 

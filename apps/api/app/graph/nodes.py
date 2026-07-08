@@ -377,14 +377,15 @@ def review_node(state: PipelineState) -> PipelineState:
     }
     passed = all(item["passed"] for item in checklist.values())
 
+    # Review runs once and never blocks: it always hands off to the human with
+    # its findings attached, rather than looping back to draft_node on its own.
+    # A run that can't converge would otherwise burn API calls up to
+    # recursion_limit before failing outright. The human decides whether a
+    # failed item needs a redraft (via a comment) or is fine to publish as-is.
     return {
         **state,
         "review_checklist": checklist,
         "review_passed": passed,
         "revision_notes": None if passed else result.get("revision_notes"),
-        "status": "awaiting_approval" if passed else "drafting",
+        "status": "awaiting_approval",
     }
-
-
-def review_router(state: PipelineState) -> str:
-    return "awaiting_human_approval" if state.get("review_passed") else "draft_node"

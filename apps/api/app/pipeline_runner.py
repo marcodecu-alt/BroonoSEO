@@ -73,17 +73,18 @@ def _persist_stream(article_id: str, stream, version_number: int):
                     latest_version_id = version_resp.data[0]["id"]
 
                 elif node_name == "review_node":
-                    passed = partial["review_passed"]
                     supabase.table("review_notes").insert(
                         {
                             "article_id": article_id,
                             "version_id": latest_version_id,
                             "checklist_json": partial["review_checklist"],
-                            "passed": passed,
+                            "passed": partial["review_passed"],
                         }
                     ).execute()
+                    # Review never blocks: it always hands off to the human with
+                    # its findings recorded, whether or not everything passed.
                     supabase.table("articles").update(
-                        {"status": "awaiting_approval" if passed else "drafting"}
+                        {"status": "awaiting_approval"}
                     ).eq("id", article_id).execute()
     except Exception as exc:
         logger.exception("Pipeline run failed for article %s", article_id)
@@ -93,22 +94,22 @@ def _persist_stream(article_id: str, stream, version_number: int):
 
 
 def run_pipeline_and_persist(article_id: str, topic_seed: str | None):
-    """Full pipeline: research -> propose -> draft -> review (with loop)."""
+    """Full pipeline: research -> propose -> draft -> review, single pass."""
     supabase.table("articles").update({"error_message": None}).eq(
         "id", article_id
     ).execute()
 
     stream = pipeline_graph.stream(
         {"topic_seed": topic_seed},
-        config={"recursion_limit": 25},
+        config={"recursion_limit": 10},
         stream_mode="updates",
     )
     _persist_stream(article_id, stream, version_number=0)
 
 
 def resume_pipeline_with_comment(article_id: str, comment_text: str):
-    """Resume from draft_node with a human comment as revision context, reusing
-    the same review->draft loop as an internal review failure."""
+    """Resume from draft_node with a human comment as revision context: one
+    draft -> review pass, then back to the human."""
     supabase.table("articles").update({"error_message": None}).eq(
         "id", article_id
     ).execute()
@@ -134,7 +135,7 @@ def resume_pipeline_with_comment(article_id: str, comment_text: str):
             "draft_content": latest_content,
             "revision_notes": comment_text,
         },
-        config={"recursion_limit": 25},
+        config={"recursion_limit": 10},
         stream_mode="updates",
     )
     _persist_stream(article_id, stream, version_number=_latest_version_number(article_id))

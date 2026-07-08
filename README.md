@@ -36,7 +36,7 @@ apps/
       graph/
         state.py          Pipeline state shape
         nodes.py           research / propose / draft / review nodes
-        graph.py           LangGraph wiring incl. review→draft loop + resume-from-draft graph
+        graph.py           LangGraph wiring: single-pass graph + resume-from-draft graph
     scripts/
       seed_content_index.py  one-time scrape of Broono's published articles
       run_pipeline.py         run one topic through the full graph via CLI
@@ -46,16 +46,17 @@ supabase/migrations/0001_init.sql
 ## Pipeline
 
 ```
-research_node → propose_node → draft_node → review_node
-                                    ^              |
-                                    |___(fail)______|
-                                                     |
-                                                  (pass)
-                                                     v
-                                          awaiting_human_approval (end state, resumed via API)
+research_node → propose_node → draft_node → review_node → awaiting_human_approval
 ```
 
-A human comment resumes the graph from `draft_node` with the comment injected as revision context, reusing the same loop path as an internal review failure.
+Single pass, no auto-retry loop. `review_node` runs once and always hands the
+article to the human with its checklist findings attached, whether or not
+everything passed, it never loops back to `draft_node` on its own. This was a
+deliberate change after a real run hit LangGraph's recursion limit (25 rounds)
+without ever converging, burning API calls on a topic the review checklist
+kept rejecting. The human is the actual gate now: reading the checklist notes
+and, if a redraft is genuinely needed, leaving a comment to trigger exactly
+one more draft → review pass.
 
 ## Review checklist (review_node)
 
