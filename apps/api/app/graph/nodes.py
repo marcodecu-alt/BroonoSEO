@@ -69,7 +69,7 @@ def _existing_articles_summary() -> str:
     )
 
 
-def _pick_style_reference_urls(tied_product: str, n: int = 2) -> list[str]:
+def _pick_style_reference_urls(tied_product: str, n: int = 1) -> list[str]:
     """Pick n existing articles most related to the tied product for style reference,
     falling back to the first n indexed articles if nothing matches."""
     articles = _existing_articles()
@@ -140,7 +140,7 @@ def research_node(state: PipelineState) -> PipelineState:
     response = _run_with_server_tools(
         RESEARCH_SYSTEM_PROMPT,
         user_content,
-        tools=[{"type": "web_search_20260209", "name": "web_search"}],
+        tools=[{"type": "web_search_20260209", "name": "web_search", "max_uses": 4}],
         output_schema=RESEARCH_OUTPUT_SCHEMA,
     )
 
@@ -257,7 +257,7 @@ def draft_node(state: PipelineState) -> PipelineState:
     response = _run_with_server_tools(
         DRAFT_SYSTEM_PROMPT,
         user_content,
-        tools=[{"type": "web_fetch_20260209", "name": "web_fetch"}],
+        tools=[{"type": "web_fetch_20260209", "name": "web_fetch", "max_content_tokens": 4000}],
     )
 
     text = _clean_draft_text(_final_text(response))
