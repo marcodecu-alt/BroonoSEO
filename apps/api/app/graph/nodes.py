@@ -95,8 +95,16 @@ mostly search symptom- and problem-led queries ("why is my dog limping"). Your j
 covered, and that plausibly tie back to one of Broono's supplement products (joint, digestive, \
 skin/coat, calming, immune support, etc).
 
-Use web search to find what dog owners actually search for: forums, "people also ask"-style \
-questions, autocomplete-style phrasing. Do not propose another ingredient-benefits article.
+Use web search to check two kinds of sources for every candidate you consider:
+1. Forums and communities (e.g. Reddit) where owners describe the problem in their own words. \
+This is how you catch the real phrasing and emotional framing behind a search, not the cleaned-up \
+version.
+2. Competitor and vet-clinic content already ranking for the topic. This is how you confirm real \
+search demand actually exists, and see exactly what's already covered so you can identify the \
+genuine gap rather than guessing at one.
+
+Also check "people also ask"-style questions and autocomplete-style phrasing. Do not propose \
+another ingredient-benefits article.
 
 Cross-check every candidate against the "existing articles" list you're given. Reject a \
 candidate if it duplicates the topic or target keyword of an existing article.
