@@ -24,13 +24,23 @@ Broono's blog has solid technical SEO but weak cadence (~12 articles since 2023)
 ```
 apps/
   web/    Next.js frontend (login, dashboard, article detail)
+    src/
+      app/login, app/dashboard, app/articles/[id]
+      lib/supabase.ts   Supabase auth client
+      lib/api.ts         typed fetch client for the FastAPI backend
   api/    FastAPI backend + LangGraph pipeline
     app/
-      main.py          FastAPI app + article endpoints
+      main.py            FastAPI app + article endpoints
+      pipeline_runner.py  runs the graph as a background task, persists to Supabase
+      supabase_client.py, claude_client.py
       graph/
-        state.py        Pipeline state shape
-        nodes.py         research / propose / draft / review nodes
-        graph.py         LangGraph wiring incl. review→draft loop
+        state.py          Pipeline state shape
+        nodes.py           research / propose / draft / review nodes
+        graph.py           LangGraph wiring incl. review→draft loop + resume-from-draft graph
+    scripts/
+      seed_content_index.py  one-time scrape of Broono's published articles
+      run_pipeline.py         run one topic through the full graph via CLI
+supabase/migrations/0001_init.sql
 ```
 
 ## Pipeline
@@ -95,15 +105,17 @@ cp .env.example .env   # fill in ANTHROPIC_API_KEY, SUPABASE_URL, SUPABASE_SERVI
 
 ## Status
 
-Scaffolding stage. LangGraph nodes are stubbed (see TODOs in `apps/api/app/graph/nodes.py`) and API endpoints return 501 pending real implementations. Supabase schema and auth are not yet wired up.
+End-to-end functional. Supabase schema, auth, and all 4 LangGraph nodes are wired to real Claude API calls (web search for research, web fetch for style reference in drafting). The full pipeline, the review→draft loop, human comments, approval, and export have all been verified against the live API/Supabase, including a real run through the frontend in a browser (login → dashboard → article detail → approve → export).
+
+Not yet done: calibrating the review checklist against more real topics (currently only run against a handful), and a second `reviewer` account (only the `owner` account exists so far, add via the same admin-API flow used for the first).
 
 ## Build order
 
-1. Supabase schema + auth, create owner + reviewer accounts
-2. FastAPI skeleton, confirm Next.js ↔ FastAPI round trip ✅ (skeleton done)
-3. Build each LangGraph node in isolation with real Claude API calls
-4. Wire the full graph incl. review→draft loop, run one topic through end to end via CLI
-5. Build the Next.js dashboard and article detail view
-6. Wire approve/comment actions from frontend into the backend API
-7. Build the export-to-document step
-8. Run against 2-3 real topics, calibrate the review agent's checklist
+1. Supabase schema + auth, create owner + reviewer accounts ✅ (owner account created, reviewer pending)
+2. FastAPI skeleton, confirm Next.js ↔ FastAPI round trip ✅
+3. Build each LangGraph node in isolation with real Claude API calls ✅
+4. Wire the full graph incl. review→draft loop, run one topic through end to end via CLI ✅
+5. Build the Next.js dashboard and article detail view ✅
+6. Wire approve/comment actions from frontend into the backend API ✅
+7. Build the export-to-document step ✅
+8. Run against 2-3 real topics, calibrate the review agent's checklist (ongoing)
