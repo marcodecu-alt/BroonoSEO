@@ -19,7 +19,7 @@ import {
   isInProgress,
 } from "@/lib/api";
 import { Logo } from "@/components/Logo";
-import { NODE_AGENTS } from "@/lib/agents";
+import { NODE_AGENTS, getAvatarUrl } from "@/lib/agents";
 
 function ChecklistRow({ label, item }: { label: string; item: ChecklistItem }) {
   return (
@@ -43,11 +43,12 @@ function TimelineStepCard({ step }: { step: TimelineStep }) {
   const agent = NODE_AGENTS[step.agent];
   return (
     <div className="relative pl-10">
-      <span
-        className={`absolute left-0 top-0 flex h-7 w-7 items-center justify-center rounded-full text-sm ${agent.colorClass}`}
-      >
-        {agent.emoji}
-      </span>
+      {/* eslint-disable-next-line @next/next/no-img-element */}
+      <img
+        src={getAvatarUrl(agent)}
+        alt={agent.name}
+        className="absolute left-0 top-0 h-7 w-7 rounded-full"
+      />
       <div className="mb-1 flex items-center justify-between">
         <p className="text-sm font-semibold text-ink">
           {agent.name} <span className="font-normal text-ink-soft">— {agent.role}</span>
