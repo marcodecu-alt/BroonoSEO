@@ -1,8 +1,90 @@
 import json
+import re
 
 from ..claude_client import client, MODEL
 from ..supabase_client import supabase
 from .state import PipelineState
+
+
+def _run_with_server_tools(system_prompt, user_content, tools, output_schema=None, max_tokens=16000):
+    """Server-side tools (web_search, web_fetch) resolve within one call, but can
+    pause_turn on long tool use. Resend to let Claude continue until it's done."""
+    kwargs = dict(
+        model=MODEL,
+        max_tokens=max_tokens,
+        system=system_prompt,
+        tools=tools,
+        messages=[{"role": "user", "content": user_content}],
+    )
+    if output_schema:
+        kwargs["output_config"] = {"format": {"type": "json_schema", "schema": output_schema}}
+
+    response = client.messages.create(**kwargs)
+
+    while response.stop_reason == "pause_turn":
+        kwargs["messages"] = [
+            {"role": "user", "content": user_content},
+            {"role": "assistant", "content": response.content},
+        ]
+        response = client.messages.create(**kwargs)
+
+    return response
+
+
+def _final_text(response) -> str:
+    """When tools are involved, Claude may emit narration text blocks before/between
+    tool calls. The real answer is the last text block, not the first."""
+    text_blocks = [b for b in response.content if b.type == "text"]
+    return text_blocks[-1].text
+
+
+def _clean_draft_text(text: str) -> str:
+    """Safety net for two habits the model has despite being told not to: wrapping
+    the article in a ```markdown fence, and adding a narration sentence before the
+    H1 (e.g. "I'll write the article now...")."""
+    text = text.strip()
+    fence_match = re.search(r"```(?:markdown)?\n(.*)\n```\s*$", text, re.DOTALL)
+    if fence_match:
+        text = fence_match.group(1).strip()
+    h1_match = re.search(r"^# .+$", text, re.MULTILINE)
+    if h1_match and h1_match.start() > 0:
+        text = text[h1_match.start():].strip()
+    return text
+
+
+def _existing_articles() -> list[dict]:
+    resp = supabase.table("existing_content_index").select(
+        "url, title, target_keyword, summary"
+    ).execute()
+    return resp.data
+
+
+def _existing_articles_summary() -> str:
+    articles = _existing_articles()
+    if not articles:
+        return "(none indexed yet)"
+    return "\n".join(
+        f"- {row['title']} (keyword: {row.get('target_keyword') or 'n/a'}) — {row.get('summary') or ''}"
+        for row in articles
+    )
+
+
+def _pick_style_reference_urls(tied_product: str, n: int = 2) -> list[str]:
+    """Pick n existing articles most related to the tied product for style reference,
+    falling back to the first n indexed articles if nothing matches."""
+    articles = _existing_articles()
+    if not articles:
+        return []
+
+    keywords = tied_product.lower().split("/")
+    matches = [
+        a for a in articles
+        if any(k.strip() and k.strip() in (a.get("summary") or "").lower() for k in keywords)
+    ]
+
+    chosen = (matches or articles)[:n]
+    return [a["url"] for a in chosen]
+
 
 RESEARCH_SYSTEM_PROMPT = """You are the research agent for Broono, a dog supplement DTC brand \
 (https://www.broono.pet/blogs/dog-health-articles).
@@ -45,48 +127,6 @@ RESEARCH_OUTPUT_SCHEMA = {
 }
 
 
-def _existing_articles_summary() -> str:
-    resp = supabase.table("existing_content_index").select(
-        "title, target_keyword, summary"
-    ).execute()
-    if not resp.data:
-        return "(none indexed yet)"
-    return "\n".join(
-        f"- {row['title']} (keyword: {row.get('target_keyword') or 'n/a'}) — {row.get('summary') or ''}"
-        for row in resp.data
-    )
-
-
-def _run_until_done(user_content: str):
-    """Server-side tools (web_search) resolve within one call, but can pause_turn on
-    long searches. Resend to let Claude continue until it produces a final answer."""
-    messages = [{"role": "user", "content": user_content}]
-    response = client.messages.create(
-        model=MODEL,
-        max_tokens=16000,
-        system=RESEARCH_SYSTEM_PROMPT,
-        tools=[{"type": "web_search_20260209", "name": "web_search"}],
-        output_config={"format": {"type": "json_schema", "schema": RESEARCH_OUTPUT_SCHEMA}},
-        messages=messages,
-    )
-
-    while response.stop_reason == "pause_turn":
-        messages = [
-            {"role": "user", "content": user_content},
-            {"role": "assistant", "content": response.content},
-        ]
-        response = client.messages.create(
-            model=MODEL,
-            max_tokens=16000,
-            system=RESEARCH_SYSTEM_PROMPT,
-            tools=[{"type": "web_search_20260209", "name": "web_search"}],
-            output_config={"format": {"type": "json_schema", "schema": RESEARCH_OUTPUT_SCHEMA}},
-            messages=messages,
-        )
-
-    return response
-
-
 def research_node(state: PipelineState) -> PipelineState:
     """Find symptom/problem-led topic candidates, cross-checked against existing_content_index."""
     topic_seed = state.get("topic_seed")
@@ -97,10 +137,15 @@ def research_node(state: PipelineState) -> PipelineState:
         + (f"Topic seed to explore: {topic_seed}" if topic_seed else "Find the next best topic.")
     )
 
-    response = _run_until_done(user_content)
+    response = _run_with_server_tools(
+        RESEARCH_SYSTEM_PROMPT,
+        user_content,
+        tools=[{"type": "web_search_20260209", "name": "web_search"}],
+        output_schema=RESEARCH_OUTPUT_SCHEMA,
+    )
 
-    text_block = next(b for b in response.content if b.type == "text")
-    candidates = json.loads(text_block.text)["candidates"]
+    text = _final_text(response)
+    candidates = json.loads(text)["candidates"]
 
     return {
         **state,
@@ -152,8 +197,8 @@ def propose_node(state: PipelineState) -> PipelineState:
         ],
     )
 
-    text_block = next(b for b in response.content if b.type == "text")
-    brief = json.loads(text_block.text)
+    text = _final_text(response)
+    brief = json.loads(text)
 
     return {
         **state,
@@ -162,30 +207,158 @@ def propose_node(state: PipelineState) -> PipelineState:
     }
 
 
+DRAFT_SYSTEM_PROMPT = """You are the draft agent for Broono, a dog supplement DTC brand \
+(https://www.broono.pet/blogs/dog-health-articles).
+
+You'll be given a content brief and 1-2 URLs of Broono's existing published articles. Use the \
+web_fetch tool to read those reference articles first, to match Broono's voice, structure, and \
+formatting conventions (they tend to be practical, warm, non-alarmist, and end with a natural \
+tie-in to a Broono product without being pushy).
+
+Write the complete article in Markdown:
+- A single H1 title
+- A one-sentence meta description near the top, labeled "Meta description:"
+- Proper H2/H3 structure
+- A short FAQ section near the end (2-4 Q&As) if relevant to the topic, matching the pattern in \
+Broono's existing content
+- A natural, non-pushy mention of the tied Broono product category near the end
+
+Do not include any health/medical claims that aren't well established and safe to state for a \
+supplement brand (e.g. don't claim to cure, treat, or diagnose disease; recommend vets for \
+anything that sounds like a medical emergency or persistent symptom).
+
+Refer to the tied product only by its general category from the brief (e.g. "a joint support \
+supplement" or "a daily joint chew"). Do not invent a specific product name, price, or URL, we \
+don't have Broono's exact product catalog wired in yet.
+
+If revision notes are provided, treat them as required changes to the previous draft, not \
+suggestions.
+
+Your final response message must contain nothing but the raw article Markdown. Do not wrap it in \
+a code fence. Do not begin with a sentence about your plan or process (e.g. "I'll write the \
+article now" or "Here's the article"), the very first characters of your response must be the \
+H1 heading itself, and nothing should follow the article's last line."""
+
+
 def draft_node(state: PipelineState) -> PipelineState:
     """Write the full article from the brief, using existing articles as style reference."""
-    # TODO: draft via Claude, incorporating revision_notes if present
+    brief = state.get("brief", {})
+    revision_notes = state.get("revision_notes")
+    reference_urls = _pick_style_reference_urls(brief.get("tied_product", ""))
+
+    user_content = (
+        f"Brief:\n{json.dumps(brief, indent=2)}\n\n"
+        f"Style reference articles:\n" + "\n".join(reference_urls or ["(none indexed yet)"])
+    )
+    if revision_notes:
+        user_content += f"\n\nRevision notes (required changes to the previous draft):\n{revision_notes}"
+        user_content += f"\n\nPrevious draft:\n{state.get('draft_content', '')}"
+
+    response = _run_with_server_tools(
+        DRAFT_SYSTEM_PROMPT,
+        user_content,
+        tools=[{"type": "web_fetch_20260209", "name": "web_fetch"}],
+    )
+
+    text = _clean_draft_text(_final_text(response))
+
     return {
         **state,
-        "draft_content": "",
+        "draft_content": text,
+        "revision_notes": None,
         "status": "drafting",
     }
 
 
+REVIEW_SYSTEM_PROMPT = """You are the review agent for Broono, a dog supplement DTC brand. You \
+check a drafted article against a fixed checklist before it goes to a human for approval. Be \
+strict, this is a supplement brand making claims about animal health.
+
+Checklist:
+1. health_claims: No unsupported health/medical claims. Fail if the article claims to cure, \
+treat, prevent, or diagnose any disease, or states something as medical fact without hedging \
+("vets recommend", "may help", "some owners find"). This is the highest-priority check.
+2. tone: Brand tone/voice consistency, practical, warm, non-alarmist, matches the existing \
+Broono articles provided for reference.
+3. seo_basics: On-page SEO basics, H1 present, H2/H3 structure present, target keyword used \
+naturally (not stuffed), a meta description present.
+4. duplication: No duplication against existing published content, listed below. Fail if the \
+draft covers substantially the same angle as an existing article.
+
+For each item return passed (true/false) and a short note explaining the verdict. If any item \
+fails, also return revision_notes: specific, actionable instructions for the draft agent to fix \
+the failing item(s)."""
+
+REVIEW_OUTPUT_SCHEMA = {
+    "type": "object",
+    "properties": {
+        "health_claims": {
+            "type": "object",
+            "properties": {"passed": {"type": "boolean"}, "note": {"type": "string"}},
+            "required": ["passed", "note"],
+            "additionalProperties": False,
+        },
+        "tone": {
+            "type": "object",
+            "properties": {"passed": {"type": "boolean"}, "note": {"type": "string"}},
+            "required": ["passed", "note"],
+            "additionalProperties": False,
+        },
+        "seo_basics": {
+            "type": "object",
+            "properties": {"passed": {"type": "boolean"}, "note": {"type": "string"}},
+            "required": ["passed", "note"],
+            "additionalProperties": False,
+        },
+        "duplication": {
+            "type": "object",
+            "properties": {"passed": {"type": "boolean"}, "note": {"type": "string"}},
+            "required": ["passed", "note"],
+            "additionalProperties": False,
+        },
+        "revision_notes": {"type": ["string", "null"]},
+    },
+    "required": ["health_claims", "tone", "seo_basics", "duplication", "revision_notes"],
+    "additionalProperties": False,
+}
+
+
 def review_node(state: PipelineState) -> PipelineState:
     """Check the draft against the fixed checklist."""
-    # TODO: run checklist via Claude
+    draft = state.get("draft_content", "")
+    brief = state.get("brief", {})
+    existing = _existing_articles_summary()
+
+    user_content = (
+        f"Brief:\n{json.dumps(brief, indent=2)}\n\n"
+        f"Existing published articles (check duplication against these):\n{existing}\n\n"
+        f"Draft to review:\n{draft}"
+    )
+
+    response = client.messages.create(
+        model=MODEL,
+        max_tokens=16000,
+        system=REVIEW_SYSTEM_PROMPT,
+        output_config={"format": {"type": "json_schema", "schema": REVIEW_OUTPUT_SCHEMA}},
+        messages=[{"role": "user", "content": user_content}],
+    )
+
+    text = _final_text(response)
+    result = json.loads(text)
+
     checklist = {
-        "health_claims": {"passed": True, "note": ""},
-        "tone": {"passed": True, "note": ""},
-        "seo_basics": {"passed": True, "note": ""},
-        "duplication": {"passed": True, "note": ""},
+        "health_claims": result["health_claims"],
+        "tone": result["tone"],
+        "seo_basics": result["seo_basics"],
+        "duplication": result["duplication"],
     }
     passed = all(item["passed"] for item in checklist.values())
+
     return {
         **state,
         "review_checklist": checklist,
         "review_passed": passed,
+        "revision_notes": None if passed else result.get("revision_notes"),
         "status": "awaiting_approval" if passed else "drafting",
     }
 
