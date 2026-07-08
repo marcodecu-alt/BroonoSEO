@@ -28,4 +28,27 @@ def build_graph():
     return graph.compile()
 
 
+def build_resume_graph():
+    """Entry point at draft_node only, for resuming after a human comment. Reuses
+    the same review->draft loop edge as the full pipeline."""
+    graph = StateGraph(PipelineState)
+
+    graph.add_node("draft_node", draft_node)
+    graph.add_node("review_node", review_node)
+
+    graph.set_entry_point("draft_node")
+    graph.add_edge("draft_node", "review_node")
+    graph.add_conditional_edges(
+        "review_node",
+        review_router,
+        {
+            "draft_node": "draft_node",
+            "awaiting_human_approval": END,
+        },
+    )
+
+    return graph.compile()
+
+
 pipeline_graph = build_graph()
+resume_pipeline_graph = build_resume_graph()

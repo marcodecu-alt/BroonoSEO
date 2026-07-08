@@ -1,7 +1,9 @@
-from fastapi import FastAPI, HTTPException
+from fastapi import BackgroundTasks, FastAPI, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.responses import PlainTextResponse
 from pydantic import BaseModel
 
+from .pipeline_runner import resume_pipeline_with_comment, run_pipeline_and_persist
 from .supabase_client import supabase
 
 app = FastAPI(title="Broono SEO Pipeline API")
@@ -29,9 +31,17 @@ class CommentRequest(BaseModel):
 
 
 @app.post("/articles/start")
-def start_article(body: StartArticleRequest):
-    # TODO: kick off pipeline_graph.invoke(...) as a background run, persist article row
-    raise HTTPException(status_code=501, detail="not implemented")
+def start_article(body: StartArticleRequest, background_tasks: BackgroundTasks):
+    resp = (
+        supabase.table("articles")
+        .insert({"status": "researching", "brief_json": {}})
+        .execute()
+    )
+    article = resp.data[0]
+
+    background_tasks.add_task(run_pipeline_and_persist, article["id"], body.topic_seed)
+
+    return article
 
 
 @app.get("/articles")
@@ -91,17 +101,80 @@ def get_article(article_id: str):
 
 @app.post("/articles/{article_id}/approve")
 def approve_article(article_id: str):
-    # TODO: set status=approved, trigger export step
-    raise HTTPException(status_code=501, detail="not implemented")
+    resp = (
+        supabase.table("articles")
+        .update({"status": "approved"})
+        .eq("id", article_id)
+        .execute()
+    )
+    if not resp.data:
+        raise HTTPException(status_code=404, detail="article not found")
+    return resp.data[0]
 
 
 @app.post("/articles/{article_id}/comment")
-def comment_on_article(article_id: str, body: CommentRequest):
-    # TODO: persist comment, resume graph from draft_node with comment as revision context
-    raise HTTPException(status_code=501, detail="not implemented")
+def comment_on_article(
+    article_id: str, body: CommentRequest, background_tasks: BackgroundTasks
+):
+    article_resp = (
+        supabase.table("articles").select("id").eq("id", article_id).execute()
+    )
+    if not article_resp.data:
+        raise HTTPException(status_code=404, detail="article not found")
+
+    version_resp = (
+        supabase.table("article_versions")
+        .select("id")
+        .eq("article_id", article_id)
+        .order("version_number", desc=True)
+        .limit(1)
+        .execute()
+    )
+    if not version_resp.data:
+        raise HTTPException(status_code=400, detail="article has no draft yet")
+    version_id = version_resp.data[0]["id"]
+
+    supabase.table("comments").insert(
+        {
+            "article_id": article_id,
+            "version_id": version_id,
+            "user_id": body.user_id,
+            "comment_text": body.comment_text,
+        }
+    ).execute()
+
+    supabase.table("articles").update({"status": "drafting"}).eq(
+        "id", article_id
+    ).execute()
+
+    background_tasks.add_task(
+        resume_pipeline_with_comment, article_id, body.comment_text
+    )
+
+    return {"status": "drafting"}
 
 
 @app.get("/articles/{article_id}/export")
 def export_article(article_id: str):
-    # TODO: return formatted markdown for the approved version
-    raise HTTPException(status_code=501, detail="not implemented")
+    article_resp = (
+        supabase.table("articles").select("*").eq("id", article_id).execute()
+    )
+    if not article_resp.data:
+        raise HTTPException(status_code=404, detail="article not found")
+    article = article_resp.data[0]
+
+    if article["status"] != "approved":
+        raise HTTPException(status_code=400, detail="article is not approved yet")
+
+    version_resp = (
+        supabase.table("article_versions")
+        .select("content")
+        .eq("article_id", article_id)
+        .order("version_number", desc=True)
+        .limit(1)
+        .execute()
+    )
+    if not version_resp.data:
+        raise HTTPException(status_code=404, detail="no version found")
+
+    return PlainTextResponse(version_resp.data[0]["content"], media_type="text/markdown")

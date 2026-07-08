@@ -1,0 +1,105 @@
+from .graph.graph import pipeline_graph, resume_pipeline_graph
+from .supabase_client import supabase
+
+
+def _latest_version_number(article_id: str) -> int:
+    resp = (
+        supabase.table("article_versions")
+        .select("version_number")
+        .eq("article_id", article_id)
+        .order("version_number", desc=True)
+        .limit(1)
+        .execute()
+    )
+    return resp.data[0]["version_number"] if resp.data else 0
+
+
+def _persist_stream(article_id: str, stream, version_number: int):
+    """Consume a LangGraph .stream(..., stream_mode='updates') iterator, persisting
+    each node's output to Supabase as it happens."""
+    latest_version_id = None
+
+    for update in stream:
+        for node_name, partial in update.items():
+            if node_name == "research_node":
+                supabase.table("articles").update(
+                    {"status": "researching"}
+                ).eq("id", article_id).execute()
+
+            elif node_name == "propose_node":
+                supabase.table("articles").update(
+                    {"brief_json": partial["brief"], "status": "proposed"}
+                ).eq("id", article_id).execute()
+
+            elif node_name == "draft_node":
+                version_number += 1
+                supabase.table("articles").update(
+                    {"status": "reviewing"}
+                ).eq("id", article_id).execute()
+                version_resp = (
+                    supabase.table("article_versions")
+                    .insert(
+                        {
+                            "article_id": article_id,
+                            "version_number": version_number,
+                            "content": partial["draft_content"],
+                            "created_by": "draft_agent",
+                        }
+                    )
+                    .execute()
+                )
+                latest_version_id = version_resp.data[0]["id"]
+
+            elif node_name == "review_node":
+                passed = partial["review_passed"]
+                supabase.table("review_notes").insert(
+                    {
+                        "article_id": article_id,
+                        "version_id": latest_version_id,
+                        "checklist_json": partial["review_checklist"],
+                        "passed": passed,
+                    }
+                ).execute()
+                supabase.table("articles").update(
+                    {"status": "awaiting_approval" if passed else "drafting"}
+                ).eq("id", article_id).execute()
+
+
+def run_pipeline_and_persist(article_id: str, topic_seed: str | None):
+    """Full pipeline: research -> propose -> draft -> review (with loop)."""
+    stream = pipeline_graph.stream(
+        {"topic_seed": topic_seed},
+        config={"recursion_limit": 25},
+        stream_mode="updates",
+    )
+    _persist_stream(article_id, stream, version_number=0)
+
+
+def resume_pipeline_with_comment(article_id: str, comment_text: str):
+    """Resume from draft_node with a human comment as revision context, reusing
+    the same review->draft loop as an internal review failure."""
+    article_resp = supabase.table("articles").select("brief_json").eq(
+        "id", article_id
+    ).execute()
+    brief = article_resp.data[0]["brief_json"]
+
+    latest_version_resp = (
+        supabase.table("article_versions")
+        .select("content")
+        .eq("article_id", article_id)
+        .order("version_number", desc=True)
+        .limit(1)
+        .execute()
+    )
+    latest_content = latest_version_resp.data[0]["content"] if latest_version_resp.data else ""
+
+    stream = resume_pipeline_graph.stream(
+        {
+            "brief": brief,
+            "draft_content": latest_content,
+            "revision_notes": comment_text,
+        },
+        config={"recursion_limit": 25},
+        stream_mode="updates",
+    )
+    _persist_stream(article_id, stream, version_number=_latest_version_number(article_id))
