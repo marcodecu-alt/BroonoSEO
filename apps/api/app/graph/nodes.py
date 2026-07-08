@@ -140,7 +140,17 @@ def research_node(state: PipelineState) -> PipelineState:
     response = _run_with_server_tools(
         RESEARCH_SYSTEM_PROMPT,
         user_content,
-        tools=[{"type": "web_search_20260209", "name": "web_search", "max_uses": 4}],
+        tools=[
+            {
+                "type": "web_search_20260209",
+                "name": "web_search",
+                "max_uses": 4,
+                # Dynamic filtering (the default allowed_callers) requires a model tier
+                # that supports programmatic tool calling; Haiku 4.5 doesn't, so call
+                # web_search directly instead.
+                "allowed_callers": ["direct"],
+            }
+        ],
         output_schema=RESEARCH_OUTPUT_SCHEMA,
     )
 
@@ -257,7 +267,16 @@ def draft_node(state: PipelineState) -> PipelineState:
     response = _run_with_server_tools(
         DRAFT_SYSTEM_PROMPT,
         user_content,
-        tools=[{"type": "web_fetch_20260209", "name": "web_fetch", "max_content_tokens": 4000}],
+        tools=[
+            {
+                "type": "web_fetch_20260209",
+                "name": "web_fetch",
+                "max_content_tokens": 4000,
+                # Same allowed_callers fix as web_search: Haiku 4.5 doesn't support
+                # the programmatic-tool-calling mode dynamic filtering defaults to.
+                "allowed_callers": ["direct"],
+            }
+        ],
     )
 
     text = _clean_draft_text(_final_text(response))
