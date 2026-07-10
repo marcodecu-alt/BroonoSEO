@@ -1,7 +1,10 @@
 from langgraph.graph import StateGraph, END
 
 from .state import PipelineState
-from .nodes import research_node, propose_node, draft_node, review_node
+from .agents.research.node import research_node
+from .agents.propose.node import propose_node
+from .agents.draft.node import draft_node
+from .agents.review.node import review_node
 
 
 def build_graph():

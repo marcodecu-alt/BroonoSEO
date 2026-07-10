@@ -1,0 +1,2 @@
+app/graph/agents/*/OUTPUT/*
+!app/graph/agents/*/OUTPUT/.gitkeep
